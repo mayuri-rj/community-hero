@@ -1,6 +1,6 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-const genAI = new GoogleGenerativeAI("AQ.Ab8RN6LjcPry9lp05esR2t4BC36ynr13fObWwcbpyIsZpsvp0Q");
+const genAI = new GoogleGenerativeAI(process.env.REACT_APP_GEMINI_API_KEY);
 
 export const analyzeIssueImage = async (imageFile) => {
   try {
