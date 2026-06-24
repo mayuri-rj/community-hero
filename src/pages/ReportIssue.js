@@ -39,6 +39,20 @@ function ReportIssue() {
 
     setSubmitting(true);
 
+    // get current location
+    let lat = 19.0760;
+    let lng = 72.8777;
+
+    try {
+      const position = await new Promise((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject);
+      });
+      lat = position.coords.latitude;
+      lng = position.coords.longitude;
+    } catch (err) {
+      console.log('Location not available, using default');
+    }
+
     try {
       // image cloudinary pe upload karo
       const imageUrl = await uploadImageToCloudinary(image);
@@ -54,6 +68,8 @@ function ReportIssue() {
         aiDescription,
         status: 'Reported',
         upvotes: 0,
+        lat,
+        lng,
         createdAt: serverTimestamp()
       });
 

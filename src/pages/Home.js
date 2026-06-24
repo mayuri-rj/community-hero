@@ -1,7 +1,34 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { db } from '../firebase/config';
+import { collection, getDocs } from 'firebase/firestore';
 
 function Home() {
+  const [stats, setStats] = useState({
+    total: 0,
+    resolved: 0,
+    inProgress: 0
+  });
+
+  useEffect(() => {
+    fetchStats();
+  }, []);
+
+  const fetchStats = async () => {
+    try {
+      const snapshot = await getDocs(collection(db, 'issues'));
+      const issues = snapshot.docs.map(doc => doc.data());
+      
+      setStats({
+        total: issues.length,
+        resolved: issues.filter(i => i.status === 'Resolved').length,
+        inProgress: issues.filter(i => i.status === 'In Progress').length
+      });
+    } catch (error) {
+      console.error('Stats error:', error);
+    }
+  };
+
   return (
     <div>
       {/* Hero Section */}
@@ -47,7 +74,7 @@ function Home() {
           textAlign: 'center',
           minWidth: '150px'
         }}>
-          <h2 style={{ color: '#2563eb', fontSize: '2rem' }}>0</h2>
+          <h2 style={{ color: '#2563eb', fontSize: '2rem' }}>{stats.total}</h2>
           <p style={{ color: '#6b7280' }}>Issues Reported</p>
         </div>
         <div style={{
@@ -58,7 +85,7 @@ function Home() {
           textAlign: 'center',
           minWidth: '150px'
         }}>
-          <h2 style={{ color: '#16a34a', fontSize: '2rem' }}>0</h2>
+          <h2 style={{ color: '#16a34a', fontSize: '2rem' }}>{stats.resolved}</h2>
           <p style={{ color: '#6b7280' }}>Issues Resolved</p>
         </div>
         <div style={{
@@ -69,7 +96,7 @@ function Home() {
           textAlign: 'center',
           minWidth: '150px'
         }}>
-          <h2 style={{ color: '#d97706', fontSize: '2rem' }}>0</h2>
+          <h2 style={{ color: '#d97706', fontSize: '2rem' }}>{stats.inProgress}</h2>
           <p style={{ color: '#6b7280' }}>In Progress</p>
         </div>
       </div>
