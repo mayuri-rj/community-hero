@@ -12,6 +12,7 @@ const STATUS_FLOW = {
 
 function Dashboard({ user, userStats }) {
   const [issues, setIssues] = useState([]);
+  const [searchLocation, setSearchLocation] = useState('');
   const [loading, setLoading] = useState(true);
 
   // Filter state
@@ -103,15 +104,6 @@ function Dashboard({ user, userStats }) {
   const categories = ['All', ...new Set(issues.map(i => i.aiCategory).filter(Boolean))];
   const severities = ['All', 'High', 'Medium', 'Low'];
   const statuses = ['All', 'Reported', 'In Progress', 'Resolved'];
-
-  // ---- Apply filters ----
-  const filteredIssues = issues.filter(issue => {
-    const matchesCategory = categoryFilter === 'All' || issue.aiCategory === categoryFilter;
-    const matchesSeverity = severityFilter === 'All' || issue.aiSeverity === severityFilter;
-    const matchesStatus = statusFilter === 'All' || issue.status === statusFilter;
-    return matchesCategory && matchesSeverity && matchesStatus;
-  });
-
   const selectStyle = {
     padding: '0.5rem 0.8rem',
     borderRadius: '8px',
@@ -134,6 +126,16 @@ function Dashboard({ user, userStats }) {
     ? getBadgesForUser(userStats.reportsCount || 0, userStats.points || 0)
     : [];
 
+  // ---- Apply filters ----
+  const filteredIssues = issues.filter(issue => {
+    const matchesCategory = categoryFilter === 'All' || issue.aiCategory === categoryFilter;
+    const matchesSeverity = severityFilter === 'All' || issue.aiSeverity === severityFilter;
+    const matchesStatus = statusFilter === 'All' || issue.status === statusFilter;
+    const matchLocation = searchLocation === '' ||
+      issue.location.toLowerCase().includes(searchLocation.toLowerCase());
+    return matchesCategory && matchesSeverity && matchesStatus && matchLocation;
+  });
+
   return (
 
     <div style={{ maxWidth: '900px', margin: '2rem auto', padding: '0 1rem' }}>
@@ -141,6 +143,22 @@ function Dashboard({ user, userStats }) {
       <p style={{ color: '#6b7280', marginBottom: '1.5rem' }}>
         {filteredIssues.length} of {issues.length} issue{issues.length !== 1 ? 's' : ''} shown
       </p>
+
+      <input
+        type="text"
+        placeholder="🔍 Search by location..."
+        value={searchLocation}
+        onChange={(e) => setSearchLocation(e.target.value)}
+        style={{
+          width: '100%',
+          padding: '0.7rem',
+          marginBottom: '1rem',
+          border: '1px solid #d1d5db',
+          borderRadius: '8px',
+          fontSize: '1rem',
+          boxSizing: 'border-box'
+        }}
+      />
 
       {user && userStats && (
         <div style={{
