@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import { useNavigate } from 'react-router-dom';
+import { MapContainer, TileLayer, Marker, Popup, useMapEvents } from 'react-leaflet';
 import { db } from '../firebase/config';
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, onSnapshot } from 'firebase/firestore';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 
@@ -13,31 +14,63 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
 });
 
+// A distinct icon for the "pending pin" so it's visually different from reported issues
+const pendingIcon = new L.Icon({
+  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+  iconSize: [30, 48],
+  iconAnchor: [15, 48],
+  className: 'pending-pin-marker'
+});
+
+// Listens for clicks on the map and reports the lat/lng up to the parent
+function ClickToPin({ onPick }) {
+  useMapEvents({
+    click: (e) => {
+      onPick(e.latlng.lat, e.latlng.lng);
+    }
+  });
+  return null;
+}
+
 function Map() {
+  const navigate = useNavigate();
   const [issues, setIssues] = useState([]);
+  const [pendingPin, setPendingPin] = useState(null); // { lat, lng } | null
 
   useEffect(() => {
-    fetchIssues();
+    // onSnapshot keeps the map's markers live — new reports from other users
+    // appear automatically without needing a page refresh.
+    const unsubscribe = onSnapshot(
+      collection(db, 'issues'),
+      (snapshot) => {
+        const issuesList = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        setIssues(issuesList);
+      },
+      (error) => {
+        console.error('Error listening to issues:', error);
+      }
+    );
+
+    // cleanup: detach the listener when the component unmounts
+    return () => unsubscribe();
   }, []);
 
-  const fetchIssues = async () => {
-    try {
-      const snapshot = await getDocs(collection(db, 'issues'));
-      const issuesList = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-      setIssues(issuesList);
-    } catch (error) {
-      console.error('Error fetching issues:', error);
-    }
+  const handleReportHere = () => {
+    if (!pendingPin) return;
+    navigate('/report', { state: { lat: pendingPin.lat, lng: pendingPin.lng } });
   };
 
   return (
     <div>
       <div style={{ padding: '1rem 2rem' }}>
         <h1 style={{ color: '#1e40af' }}>🗺️ Issues Map</h1>
-        <p style={{ color: '#6b7280' }}>See all reported issues in your area</p>
+        <p style={{ color: '#6b7280' }}>
+          See all reported issues in your area — click anywhere on the map to report a new one there
+        </p>
       </div>
       <MapContainer
         center={[19.0760, 72.8777]}
@@ -48,6 +81,10 @@ function Map() {
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           attribution='&copy; OpenStreetMap contributors'
         />
+
+        <ClickToPin onPick={(lat, lng) => setPendingPin({ lat, lng })} />
+
+        {/* Existing reported issues */}
         {issues.map(issue => (
           issue.lat && issue.lng && (
             <Marker key={issue.id} position={[issue.lat, issue.lng]}>
@@ -60,6 +97,37 @@ function Map() {
             </Marker>
           )
         ))}
+
+        {/* Temporary pin for a location the user just clicked */}
+        {pendingPin && (
+          <Marker
+            position={[pendingPin.lat, pendingPin.lng]}
+            icon={pendingIcon}
+          >
+            <Popup>
+              <div style={{ textAlign: 'center' }}>
+                <p style={{ margin: '0 0 0.5rem' }}>
+                  📍 {pendingPin.lat.toFixed(5)}, {pendingPin.lng.toFixed(5)}
+                </p>
+                <button
+                  onClick={handleReportHere}
+                  style={{
+                    backgroundColor: '#2563eb',
+                    color: 'white',
+                    border: 'none',
+                    padding: '0.4rem 0.9rem',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    fontWeight: 'bold',
+                    fontSize: '0.85rem'
+                  }}
+                >
+                  🚨 Report issue here
+                </button>
+              </div>
+            </Popup>
+          </Marker>
+        )}
       </MapContainer>
     </div>
   );

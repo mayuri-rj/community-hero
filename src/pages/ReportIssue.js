@@ -1,11 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useLocation as useRouterLocation } from 'react-router-dom';
 import { analyzeIssueImage } from '../services/geminiService';
 import { uploadImageToCloudinary } from '../services/cloudinaryService';
 import { db } from '../firebase/config';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import LocationPicker from '../components/LocationPicker';
+import { awardPointsForReport } from '../services/gamificationService';
 
-function ReportIssue() {
-  const [name, setName] = useState('');
+function ReportIssue({ user }) {
+  const routerLocation = useRouterLocation();
+
   const [location, setLocation] = useState('');
   const [description, setDescription] = useState('');
   const [image, setImage] = useState(null);
@@ -16,6 +20,19 @@ function ReportIssue() {
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+
+  // Pinned coordinates (from map click, current-location button, or Map page handoff)
+  const [lat, setLat] = useState(null);
+  const [lng, setLng] = useState(null);
+  const [locatingMe, setLocatingMe] = useState(false);
+
+  // If user came from Map page "Report issue here", pick up the coordinates it passed along
+  useEffect(() => {
+    if (routerLocation.state?.lat && routerLocation.state?.lng) {
+      setLat(routerLocation.state.lat);
+      setLng(routerLocation.state.lng);
+    }
+  }, [routerLocation.state]);
 
   const handleImageChange = async (e) => {
     const file = e.target.files[0];
@@ -31,27 +48,33 @@ function ReportIssue() {
     }
   };
 
+  const handleUseCurrentLocation = () => {
+    setLocatingMe(true);
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setLat(position.coords.latitude);
+        setLng(position.coords.longitude);
+        setLocatingMe(false);
+      },
+      (err) => {
+        console.log('Location not available:', err);
+        alert('Could not get your current location. Please pin it on the map instead.');
+        setLocatingMe(false);
+      }
+    );
+  };
+
   const handleSubmit = async () => {
-    if (!name || !location || !image) {
-      alert('Please fill name, location and upload an image!');
+    if (!location || !image) {
+      alert('Please fill location and upload an image!');
       return;
     }
 
     setSubmitting(true);
 
-    // get current location
-    let lat = 19.0760;
-    let lng = 72.8777;
-
-    try {
-      const position = await new Promise((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(resolve, reject);
-      });
-      lat = position.coords.latitude;
-      lng = position.coords.longitude;
-    } catch (err) {
-      console.log('Location not available, using default');
-    }
+    // Use the pinned location if available, otherwise fall back to Mumbai default
+    let finalLat = lat ?? 19.0760;
+    let finalLng = lng ?? 72.8777;
 
     try {
       // image cloudinary pe upload karo
@@ -59,7 +82,8 @@ function ReportIssue() {
 
       // firestore mein save karo
       await addDoc(collection(db, 'issues'), {
-        name,
+        name: user.displayName || 'Anonymous',
+        reporterUid: user.uid,
         location,
         description,
         imageUrl,
@@ -68,20 +92,24 @@ function ReportIssue() {
         aiDescription,
         status: 'Reported',
         upvotes: 0,
-        lat,
-        lng,
+        lat: finalLat,
+        lng: finalLng,
         createdAt: serverTimestamp()
       });
 
+      // Gamification: reporter ko points milte hain har successful report pe
+      await awardPointsForReport(user.uid);
+
       setSubmitted(true);
       // form reset
-      setName('');
       setLocation('');
       setDescription('');
       setImage(null);
       setImagePreview(null);
       setAiCategory('');
       setAiSeverity('');
+      setLat(null);
+      setLng(null);
 
     } catch (error) {
       console.error('Submit error:', error);
@@ -122,23 +150,24 @@ function ReportIssue() {
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
 
-        <div>
-          <label style={{ fontWeight: 'bold', color: '#374151' }}>Your Name</label>
-          <input
-            type="text"
-            placeholder="Enter your name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            style={{
-              width: '100%',
-              padding: '0.7rem',
-              marginTop: '0.3rem',
-              border: '1px solid #d1d5db',
-              borderRadius: '8px',
-              fontSize: '1rem',
-              boxSizing: 'border-box'
-            }}
-          />
+        <div style={{
+          backgroundColor: '#f0fdf4',
+          padding: '0.7rem 1rem',
+          borderRadius: '8px',
+          color: '#166534',
+          fontSize: '0.9rem',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.5rem'
+        }}>
+          {user?.photoURL && (
+            <img
+              src={user.photoURL}
+              alt="you"
+              style={{ width: '24px', height: '24px', borderRadius: '50%' }}
+            />
+          )}
+          Reporting as <strong>{user?.displayName || 'Anonymous'}</strong> · +10 points on submit 🎯
         </div>
 
         <div>
@@ -158,6 +187,39 @@ function ReportIssue() {
               boxSizing: 'border-box'
             }}
           />
+        </div>
+
+        <div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <label style={{ fontWeight: 'bold', color: '#374151' }}>Pin Exact Location</label>
+            <button
+              type="button"
+              onClick={handleUseCurrentLocation}
+              disabled={locatingMe}
+              style={{
+                backgroundColor: '#eff6ff',
+                color: '#2563eb',
+                border: '1px solid #bfdbfe',
+                padding: '0.3rem 0.7rem',
+                borderRadius: '20px',
+                fontSize: '0.8rem',
+                fontWeight: 'bold',
+                cursor: locatingMe ? 'not-allowed' : 'pointer'
+              }}
+            >
+              {locatingMe ? '📡 Locating...' : '📍 Use my current location'}
+            </button>
+          </div>
+          <div style={{ marginTop: '0.5rem' }}>
+            <LocationPicker
+              lat={lat}
+              lng={lng}
+              onLocationSelect={(newLat, newLng) => {
+                setLat(newLat);
+                setLng(newLng);
+              }}
+            />
+          </div>
         </div>
 
         <div>

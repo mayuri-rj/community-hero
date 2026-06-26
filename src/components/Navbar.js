@@ -2,11 +2,17 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { auth } from '../firebase/config';
 import { signOut } from 'firebase/auth';
+import { getBadgesForUser } from '../services/gamificationService';
 
-function Navbar({ user }) {
+function Navbar({ user, userStats }) {  // 👈 userStats add kiya
   const handleLogout = async () => {
     await signOut(auth);
   };
+
+  // Top badge nikalo (highest earned badge)
+  const topBadge = userStats
+    ? getBadgesForUser(userStats.reportsCount || 0, userStats.points || 0).slice(-1)[0]
+    : null;
 
   return (
     <nav style={{
@@ -28,6 +34,26 @@ function Navbar({ user }) {
         <Link to="/map" style={{ color: 'white', textDecoration: 'none' }}>Map</Link>
         {user && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
+
+            {/* ⭐ Points + Badge chip — NEW */}
+            {userStats && (
+              <div style={{
+                backgroundColor: 'rgba(255,255,255,0.15)',
+                border: '1px solid rgba(255,255,255,0.5)',
+                borderRadius: '20px',
+                padding: '4px 12px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                color: 'white',
+                fontSize: '0.85rem',
+                fontWeight: 'bold'
+              }}>
+                ⭐ {userStats.points || 0}
+                {topBadge && <span title={topBadge.name}>{topBadge.emoji}</span>}
+              </div>
+            )}
+
             {user.photoURL && (
               <img
                 src={user.photoURL}
