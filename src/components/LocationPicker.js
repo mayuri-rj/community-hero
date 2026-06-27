@@ -53,9 +53,12 @@ function LocationPicker({
           zoom={zoom}
           style={{ height, width: '100%' }}
         >
+          {/* CartoDB Voyager — crisp tiles with road/shop/landmark labels, no API key needed */}
           <TileLayer
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-            attribution='&copy; OpenStreetMap contributors'
+            url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+            subdomains="abcd"
+            maxZoom={20}
           />
           <ClickListener onSelect={onLocationSelect} />
           {lat && lng && <Marker position={[lat, lng]} />}

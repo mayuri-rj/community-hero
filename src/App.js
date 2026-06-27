@@ -62,9 +62,8 @@ function App() {
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/report" element={<ReportIssue user={user} />} />
-        <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/map" element={<Map />} />
         <Route path="/dashboard" element={<Dashboard user={user} userStats={userStats} />} />
+        <Route path="/map" element={<Map />} />
       </Routes>
     </Router>
   );
