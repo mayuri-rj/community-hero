@@ -10,15 +10,15 @@ export const POINTS = {
 
 // ---- Badge thresholds ----
 const REPORT_BADGES = [
-  { threshold: 10, name: 'Civic Champion', emoji: '🏆' },
-  { threshold: 5, name: 'Community Guardian', emoji: '🦸' },
+  { threshold: 5, name: 'Civic Champion', emoji: '🏆' },
+  { threshold: 3, name: 'Community Guardian', emoji: '🦸' },
   { threshold: 1, name: 'Newcomer', emoji: '🌱' }
 ];
 
 const POINTS_BADGES = [
-  { threshold: 300, name: 'Gold Hero', emoji: '🥇' },
-  { threshold: 150, name: 'Silver Hero', emoji: '🥈' },
-  { threshold: 50, name: 'Bronze Hero', emoji: '🥉' }
+  { threshold: 100, name: 'Gold Hero', emoji: '🥇' },
+  { threshold: 50, name: 'Silver Hero', emoji: '🥈' },
+  { threshold: 20, name: 'Bronze Hero', emoji: '🥉' }
 ];
 
 /**
@@ -49,17 +49,24 @@ export const getBadgesForUser = (reportsCount = 0, points = 0) => {
 export const ensureUserDoc = async (user) => {
   if (!user) return;
   const userRef = doc(db, 'users', user.uid);
-
-  await setDoc(
-    userRef,
-    {
+  const snapshot = await getDoc(userRef);
+  
+  if (!snapshot.exists()) {
+    // sirf naye user ke liye create karo
+    await setDoc(userRef, {
+      displayName: user.displayName || 'Anonymous',
       name: user.displayName || 'Anonymous',
       photoURL: user.photoURL || null,
       points: 0,
       reportsCount: 0
-    },
-    { merge: true } // won't overwrite points/reportsCount if doc already has them
-  );
+    });
+  } else {
+    // existing user ke liye sirf name aur photo update karo
+    await updateDoc(userRef, {
+      displayName: user.displayName || 'Anonymous',
+      photoURL: user.photoURL || null,
+    });
+  }
 };
 
 /**
@@ -72,7 +79,12 @@ const ensureUserDocExists = async (uid) => {
   const userRef = doc(db, 'users', uid);
   const snapshot = await getDoc(userRef);
   if (!snapshot.exists()) {
-    await setDoc(userRef, { points: 0, reportsCount: 0 }, { merge: true });
+    await setDoc(userRef, { 
+      points: 0, 
+      reportsCount: 0,
+      displayName: 'Anonymous',
+      photoURL: null
+    }, { merge: true });
   }
   return userRef;
 };
@@ -94,7 +106,6 @@ export const awardPointsForReport = async (uid) => {
     });
   } catch (error) {
     console.error('Gamification error (awardPointsForReport):', error);
-    // Swallow the error — the issue report itself already succeeded.
   }
 };
 
