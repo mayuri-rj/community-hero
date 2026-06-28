@@ -46,7 +46,7 @@ function ReportIssue({ user }) {
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [aiDescription, setAiDescription] = useState('');
-const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [markerPos, setMarkerPos] = useState(null);
   const [searching, setSearching] = useState(false);
   const searchTimeout = useRef(null);
@@ -97,7 +97,10 @@ const [loading, setLoading] = useState(false);
 
     setSubmitting(true);
     try {
-      const imageUrl = await uploadImageToCloudinary(image);
+      const result = await uploadImageToCloudinary(image);
+      const imageUrl = result?.url || null;
+      const mediaType = result?.type || 'image';
+
       await addDoc(collection(db, 'issues'), {
         name: user.displayName,
         reporterUid: user.uid,
@@ -105,6 +108,7 @@ const [loading, setLoading] = useState(false);
         location,
         description,
         imageUrl,
+        mediaType,
         aiCategory: aiCategory || 'Other',
         aiSeverity: aiSeverity || 'Medium',
         aiDescription,
@@ -337,7 +341,7 @@ const [loading, setLoading] = useState(false);
 
         {/* Image Upload */}
         <div>
-          <label className="label">📸 Upload Photo</label>
+          <label className="label">📸 Upload Photo or Video</label>
           <div style={{
             border: '2px dashed #bfdbfe', borderRadius: '12px',
             padding: '1.5rem', textAlign: 'center', cursor: 'pointer',
@@ -345,7 +349,7 @@ const [loading, setLoading] = useState(false);
           }}>
             <input
               type="file"
-              accept="image/*"
+              accept="image/*,video/*"
               onChange={handleImageChange}
               style={{
                 position: 'absolute', inset: 0,
@@ -359,10 +363,10 @@ const [loading, setLoading] = useState(false);
               <div>
                 <div style={{ fontSize: '2.5rem', marginBottom: '0.5rem' }}>📷</div>
                 <p style={{ color: '#3b82f6', fontWeight: '600', margin: '0 0 0.2rem' }}>
-                  Click to upload photo
+                  Click to upload photo or video
                 </p>
                 <p style={{ color: '#9ca3af', fontSize: '0.8rem', margin: 0 }}>
-                  JPG, PNG, WebP supported
+                  JPG, PNG, WebP, MP4 supported
                 </p>
               </div>
             )}

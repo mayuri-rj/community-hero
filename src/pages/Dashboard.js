@@ -106,6 +106,26 @@ function Dashboard({ user, userStats }) {
     }
   };
 
+  const handleWitness = async (issue) => {
+    if (issue.reporterUid === user?.uid) {
+      alert("You can't witness your own issue!");
+      return;
+    }
+    if (issue.witnesses?.includes(user?.uid)) {
+      alert("You already confirmed this issue!");
+      return;
+    }
+    try {
+      const issueRef = doc(db, 'issues', issue.id);
+      await updateDoc(issueRef, {
+        witnesses: [...(issue.witnesses || []), user.uid],
+        witnessCount: increment(1)
+      });
+    } catch (error) {
+      console.error('Witness error:', error);
+    }
+  };
+
   const handleStatusUpdate = async (issue) => {
     const newStatus = STATUS_FLOW[issue.status] || 'Reported';
 
@@ -670,14 +690,24 @@ function Dashboard({ user, userStats }) {
                   animationDelay: `${Math.min(idx * 0.05, 0.4)}s`
                 }}
               >
-                {/* Image */}
+                {/* Image/Video */}
                 {issue.imageUrl && (
                   <div style={{ width: '150px', height: '150px', flexShrink: 0, overflow: 'hidden' }}>
-                    <img
-                      src={issue.imageUrl}
-                      alt="issue"
-                      style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-                    />
+                    {issue.mediaType === 'video' ? (
+                      <video
+                        src={issue.imageUrl}
+                        style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                        muted
+                        autoPlay
+                        loop
+                      />
+                    ) : (
+                      <img
+                        src={issue.imageUrl}
+                        alt="issue"
+                        style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                      />
+                    )}
                   </div>
                 )}
 
@@ -770,6 +800,41 @@ function Dashboard({ user, userStats }) {
                     >
                       🔄 Mark as {STATUS_FLOW[issue.status] || 'Reported'}
                     </button>
+
+                    <button
+                      onClick={() => handleWitness(issue)}
+                      disabled={issue.witnesses?.includes(user?.uid) || issue.reporterUid === user?.uid}
+                      style={{
+                        backgroundColor: (issue.witnesses?.includes(user?.uid) || issue.reporterUid === user?.uid) ? '#f1f5f9' : '#f0fdf4',
+                        color: (issue.witnesses?.includes(user?.uid) || issue.reporterUid === user?.uid) ? '#9ca3af' : '#16a34a',
+                        border: `1px solid ${(issue.witnesses?.includes(user?.uid) || issue.reporterUid === user?.uid) ? '#e2e8f0' : '#86efac'}`,
+                        padding: '4px 12px', borderRadius: '20px',
+                        cursor: (issue.witnesses?.includes(user?.uid) || issue.reporterUid === user?.uid) ? 'not-allowed' : 'pointer',
+                        fontWeight: '600', fontSize: '0.8rem'
+                      }}
+                    >
+                      👀 {issue.witnessCount || 0} Also See This
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        const text = `🚨 Community Issue Reported!\n📍 ${issue.location}\n🏷️ ${issue.aiCategory}\n⚠️ ${issue.aiSeverity} Severity\n\nHelp resolve this issue! View on Community Hero:\nhttps://community-hero-ec722.web.app`;
+                        const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(text)}`;
+                        window.open(whatsappUrl, '_blank');
+                      }}
+                      style={{
+                        backgroundColor: '#f0fdf4',
+                        color: '#16a34a',
+                        border: '1px solid #86efac',
+                        padding: '4px 12px',
+                        borderRadius: '20px',
+                        cursor: 'pointer',
+                        fontWeight: '600',
+                        fontSize: '0.8rem'
+                      }}
+                    >
+                      📤 Share
+                    </button>
                   </div>
                 </div>
               </div>
@@ -777,6 +842,7 @@ function Dashboard({ user, userStats }) {
           </div>
         )}
       </div>
+
 
       {/* Detail Modal */}
       {selectedIssue && (
@@ -870,6 +936,7 @@ function Dashboard({ user, userStats }) {
                 >
                   👍 Upvote
                 </button>
+
                 <button
                   className="db-btn"
                   onClick={() => handleStatusUpdate(selectedIssue)}
