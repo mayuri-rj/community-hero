@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { generateInsights } from '../services/insightsService';
 import { db } from '../firebase/config';
 import { collection, onSnapshot, orderBy, query, doc, updateDoc, increment } from 'firebase/firestore';
 import { awardPointsForUpvote, awardPointsForResolved } from '../services/gamificationService';
@@ -28,6 +29,9 @@ function Dashboard({ user, userStats }) {
 
   // Modal state
   const [selectedIssue, setSelectedIssue] = useState(null);
+
+  const [insights, setInsights] = useState(null);
+  const [insightsLoading, setInsightsLoading] = useState(false);
 
   useEffect(() => {
     setLoading(true);
@@ -69,7 +73,7 @@ function Dashboard({ user, userStats }) {
       unsubscribeUsers();
     };
   }, []);
-  
+
   // Close modal on Escape key
   useEffect(() => {
     const handleEsc = (e) => {
@@ -366,69 +370,155 @@ function Dashboard({ user, userStats }) {
         />
 
         {/* Leaderboard */}
-{topHeroes.length > 0 && (
-  <div style={{
-    backgroundColor: 'white',
-    border: '1px solid #e2e8f0',
-    borderRadius: '12px',
-    padding: '1rem 1.25rem',
-    marginBottom: '1.5rem'
-  }}>
-    <h3 style={{ color: '#1e3a8a', margin: '0 0 1rem', fontSize: '1rem', fontWeight: '700' }}>
-      🏆 Top Community Heroes
-    </h3>
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-      {topHeroes.map((hero, idx) => (
-        <div key={hero.id} style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '10px',
-          padding: '8px 10px',
-          borderRadius: '10px',
-          backgroundColor: idx === 0 ? '#fefce8' : idx === 1 ? '#f8fafc' : 'transparent',
-          border: idx === 0 ? '1px solid #fde68a' : '1px solid transparent'
-        }}>
-          <span style={{ fontSize: '1.2rem', minWidth: '28px', textAlign: 'center' }}>
-            {idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `#${idx + 1}`}
-          </span>
-          {hero.photoURL ? (
-            <img src={hero.photoURL} alt="avatar"
-              style={{ width: '32px', height: '32px', borderRadius: '50%', flexShrink: 0 }} />
-          ) : (
-            <div style={{
-              width: '32px', height: '32px', borderRadius: '50%',
-              backgroundColor: '#dbeafe', display: 'flex',
-              alignItems: 'center', justifyContent: 'center',
-              fontSize: '0.9rem', flexShrink: 0
-            }}>🦸</div>
-          )}
-          <div style={{ flex: 1 }}>
-            <p style={{ margin: 0, fontWeight: '600', fontSize: '0.85rem', color: '#111827' }}>
-              {hero.displayName || 'Anonymous Hero'}
-            </p>
-            <p style={{ margin: 0, fontSize: '0.75rem', color: '#9ca3af' }}>
-              {hero.reportsCount || 0} reports
-            </p>
-          </div>
-          <span style={{
-            backgroundColor: '#eff6ff', color: '#2563eb',
-            padding: '3px 10px', borderRadius: '20px',
-            fontSize: '0.8rem', fontWeight: '700'
+        {topHeroes.length > 0 && (
+          <div style={{
+            backgroundColor: 'white',
+            border: '1px solid #e2e8f0',
+            borderRadius: '12px',
+            padding: '1rem 1.25rem',
+            marginBottom: '1.5rem'
           }}>
-            ⭐ {hero.points || 0}
-          </span>
-          {hero.id === user?.uid && (
-            <span style={{
-              backgroundColor: '#dcfce7', color: '#16a34a',
-              padding: '2px 8px', borderRadius: '20px',
-              fontSize: '0.7rem', fontWeight: '600'
-            }}>You</span>
+            <h3 style={{ color: '#1e3a8a', margin: '0 0 1rem', fontSize: '1rem', fontWeight: '700' }}>
+              🏆 Top Community Heroes
+            </h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {topHeroes.map((hero, idx) => (
+                <div key={hero.id} style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px',
+                  padding: '8px 10px',
+                  borderRadius: '10px',
+                  backgroundColor: idx === 0 ? '#fefce8' : idx === 1 ? '#f8fafc' : 'transparent',
+                  border: idx === 0 ? '1px solid #fde68a' : '1px solid transparent'
+                }}>
+                  <span style={{ fontSize: '1.2rem', minWidth: '28px', textAlign: 'center' }}>
+                    {idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `#${idx + 1}`}
+                  </span>
+                  {hero.photoURL ? (
+                    <img src={hero.photoURL} alt="avatar"
+                      style={{ width: '32px', height: '32px', borderRadius: '50%', flexShrink: 0 }} />
+                  ) : (
+                    <div style={{
+                      width: '32px', height: '32px', borderRadius: '50%',
+                      backgroundColor: '#dbeafe', display: 'flex',
+                      alignItems: 'center', justifyContent: 'center',
+                      fontSize: '0.9rem', flexShrink: 0
+                    }}>🦸</div>
+                  )}
+                  <div style={{ flex: 1 }}>
+                    <p style={{ margin: 0, fontWeight: '600', fontSize: '0.85rem', color: '#111827' }}>
+                      {hero.displayName || 'Anonymous Hero'}
+                    </p>
+                    <p style={{ margin: 0, fontSize: '0.75rem', color: '#9ca3af' }}>
+                      {hero.reportsCount || 0} reports
+                    </p>
+                  </div>
+                  <span style={{
+                    backgroundColor: '#eff6ff', color: '#2563eb',
+                    padding: '3px 10px', borderRadius: '20px',
+                    fontSize: '0.8rem', fontWeight: '700'
+                  }}>
+                    ⭐ {hero.points || 0}
+                  </span>
+                  {hero.id === user?.uid && (
+                    <span style={{
+                      backgroundColor: '#dcfce7', color: '#16a34a',
+                      padding: '2px 8px', borderRadius: '20px',
+                      fontSize: '0.7rem', fontWeight: '600'
+                    }}>You</span>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* AI Insights */}
+        <div style={{
+          backgroundColor: 'white',
+          border: '1px solid #e2e8f0',
+          borderRadius: '12px',
+          padding: '1rem 1.25rem',
+          marginBottom: '1.5rem'
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+            <h3 style={{ color: '#1e3a8a', margin: 0, fontSize: '1rem', fontWeight: '700' }}>
+              🤖 AI Insights
+            </h3>
+            <button
+              onClick={async () => {
+                setInsightsLoading(true);
+                const result = await generateInsights(issues);
+                setInsights(result);
+                setInsightsLoading(false);
+              }}
+              style={{
+                backgroundColor: '#eff6ff',
+                color: '#2563eb',
+                border: '1px solid #bfdbfe',
+                padding: '0.4rem 1rem',
+                borderRadius: '20px',
+                cursor: 'pointer',
+                fontSize: '0.85rem',
+                fontWeight: '600'
+              }}
+            >
+              {insightsLoading ? '⏳ Analyzing...' : '✨ Generate Insights'}
+            </button>
+          </div>
+
+          {insightsLoading && (
+            <div style={{ textAlign: 'center', padding: '1rem', color: '#6b7280' }}>
+              🤖 AI is analyzing community data...
+            </div>
+          )}
+
+          {insights && !insightsLoading && (
+            <div>
+              <p style={{
+                backgroundColor: '#eff6ff',
+                color: '#1d4ed8',
+                padding: '0.6rem 1rem',
+                borderRadius: '8px',
+                fontSize: '0.85rem',
+                fontWeight: '600',
+                margin: '0 0 1rem'
+              }}>
+                📊 {insights.summary}
+              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {insights.insights?.map((insight, i) => (
+                  <div key={i} style={{
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: '10px',
+                    padding: '0.7rem',
+                    backgroundColor: '#f8fafc',
+                    borderRadius: '8px',
+                    border: '1px solid #e2e8f0'
+                  }}>
+                    <span style={{ fontSize: '1.3rem' }}>{insight.icon}</span>
+                    <div>
+                      <p style={{ margin: '0 0 2px', fontWeight: '700', fontSize: '0.85rem', color: '#111827' }}>
+                        {insight.title}
+                      </p>
+                      <p style={{ margin: 0, fontSize: '0.8rem', color: '#6b7280' }}>
+                        {insight.description}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {!insights && !insightsLoading && (
+            <p style={{ color: '#9ca3af', fontSize: '0.85rem', margin: 0, textAlign: 'center' }}>
+              Click "Generate Insights" to get AI analysis of community issues 🤖
+            </p>
           )}
         </div>
-      ))}
-    </div>
-  </div>
-)}
 
         {/* Filters + Sort */}
         <div className="db-filter-card" style={{

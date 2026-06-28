@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from 'react-leaflet';
-import { analyzeIssueImage } from '../services/geminiService';
 import { uploadImageToCloudinary } from '../services/cloudinaryService';
 import { db } from '../firebase/config';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
@@ -44,10 +43,10 @@ function ReportIssue({ user }) {
   const [imagePreview, setImagePreview] = useState(null);
   const [aiCategory, setAiCategory] = useState('');
   const [aiSeverity, setAiSeverity] = useState('');
-  const [aiDescription, setAiDescription] = useState('');
-  const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [aiDescription, setAiDescription] = useState('');
+const [loading, setLoading] = useState(false);
   const [markerPos, setMarkerPos] = useState(null);
   const [searching, setSearching] = useState(false);
   const searchTimeout = useRef(null);
@@ -74,17 +73,11 @@ function ReportIssue({ user }) {
     }, 800);
   }, [location]);
 
-  const handleImageChange = async (e) => {
+  const handleImageChange = (e) => {
     const file = e.target.files[0];
     if (file) {
       setImage(file);
       setImagePreview(URL.createObjectURL(file));
-      setLoading(true);
-      const result = await analyzeIssueImage(file);
-      setAiCategory(result.category);
-      setAiSeverity(result.severity);
-      setAiDescription(result.description);
-      setLoading(false);
     }
   };
 
@@ -304,6 +297,42 @@ function ReportIssue({ user }) {
             className="input-field"
             style={{ resize: 'vertical' }}
           />
+        </div>
+
+        {/* Category */}
+        <div>
+          <label className="label">🏷️ Issue Category</label>
+          <select
+            value={aiCategory}
+            onChange={(e) => setAiCategory(e.target.value)}
+            className="input-field"
+            style={{ cursor: 'pointer' }}
+          >
+            <option value="">Select category...</option>
+            <option value="Pothole">🕳️ Pothole</option>
+            <option value="Garbage/Waste">🗑️ Garbage/Waste</option>
+            <option value="Broken Streetlight">💡 Broken Streetlight</option>
+            <option value="Water Leakage">💧 Water Leakage</option>
+            <option value="Damaged Road">🛣️ Damaged Road</option>
+            <option value="Encroachment">🚧 Encroachment</option>
+            <option value="Other">❓ Other</option>
+          </select>
+        </div>
+
+        {/* Severity */}
+        <div>
+          <label className="label">⚠️ Severity</label>
+          <select
+            value={aiSeverity}
+            onChange={(e) => setAiSeverity(e.target.value)}
+            className="input-field"
+            style={{ cursor: 'pointer' }}
+          >
+            <option value="">Select severity...</option>
+            <option value="High">🔴 High</option>
+            <option value="Medium">🟡 Medium</option>
+            <option value="Low">🟢 Low</option>
+          </select>
         </div>
 
         {/* Image Upload */}
