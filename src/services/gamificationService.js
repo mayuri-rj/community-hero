@@ -50,7 +50,7 @@ export const ensureUserDoc = async (user) => {
   if (!user) return;
   const userRef = doc(db, 'users', user.uid);
   const snapshot = await getDoc(userRef);
-  
+
   if (!snapshot.exists()) {
     // sirf naye user ke liye create karo
     await setDoc(userRef, {
@@ -79,8 +79,8 @@ const ensureUserDocExists = async (uid) => {
   const userRef = doc(db, 'users', uid);
   const snapshot = await getDoc(userRef);
   if (!snapshot.exists()) {
-    await setDoc(userRef, { 
-      points: 0, 
+    await setDoc(userRef, {
+      points: 0,
       reportsCount: 0,
       displayName: 'Anonymous',
       photoURL: null
@@ -106,6 +106,29 @@ export const awardPointsForReport = async (uid) => {
     });
   } catch (error) {
     console.error('Gamification error (awardPointsForReport):', error);
+  }
+};
+
+export const checkAndNotifyBadge = async (uid, reportsCount, points) => {
+  try {
+    const newBadges = getBadgesForUser(reportsCount, points);
+    const oldBadges = getBadgesForUser(reportsCount - 1, points - POINTS.REPORT_ISSUE);
+
+    const earnedNew = newBadges.filter(b => !oldBadges.includes(b));
+
+    if (earnedNew.length > 0) {
+      const { db } = await import('../firebase/config');
+      const { addDoc, collection, serverTimestamp } = await import('firebase/firestore');
+
+      await addDoc(collection(db, 'notifications'), {
+        toUid: uid,
+        message: `🏆 You earned a new badge: ${earnedNew[0].emoji} ${earnedNew[0].name}!`,
+        read: false,
+        createdAt: serverTimestamp()
+      });
+    }
+  } catch (err) {
+    console.error('Badge notification error:', err);
   }
 };
 

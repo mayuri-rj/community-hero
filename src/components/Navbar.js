@@ -1,4 +1,5 @@
 import React from 'react';
+import Notifications from './Notifications';
 import { Link, useLocation } from 'react-router-dom';
 import { auth } from '../firebase/config';
 import { signOut } from 'firebase/auth';
@@ -44,6 +45,7 @@ function Navbar({ user, userStats }) {
 
         {user && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
+            <Notifications user={user} />
             {userStats && (
               <span style={{
                 backgroundColor: 'rgba(255,255,255,0.2)',
@@ -56,6 +58,8 @@ function Navbar({ user, userStats }) {
                 ⭐ {userStats.points || 0} pts
               </span>
             )}
+
+            
             {user.photoURL && (
               <img
                 src={user.photoURL}

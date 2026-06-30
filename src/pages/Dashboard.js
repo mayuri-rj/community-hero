@@ -1,9 +1,19 @@
 import React, { useEffect, useState } from 'react';
 import { generateInsights } from '../services/insightsService';
 import { db } from '../firebase/config';
-import { collection, onSnapshot, orderBy, query, doc, updateDoc, increment } from 'firebase/firestore';
 import { awardPointsForUpvote, awardPointsForResolved } from '../services/gamificationService';
 import { getBadgesForUser } from '../services/gamificationService';
+import { runAgentCycle } from '../services/agentService';
+import { collection, onSnapshot, orderBy, query, doc, updateDoc, increment, addDoc, serverTimestamp } from 'firebase/firestore';
+import { seedDemoData } from '../services/seedDemoData';
+//import { cleanupAndReseed } from '../services/cleanupAndReseed';
+
+//Admin Emails
+const ADMIN_EMAILS = [
+  'jadhavmayuri9870@gmail.com',      // 👈 my email 
+  'associations@blockseblock.com'    // 👈 team member email
+
+];
 
 const STATUS_FLOW = {
   'Reported': 'In Progress',
@@ -33,6 +43,11 @@ function Dashboard({ user, userStats }) {
   const [insights, setInsights] = useState(null);
   const [insightsLoading, setInsightsLoading] = useState(false);
 
+  //Admin
+  const isAdmin = ADMIN_EMAILS.includes(user?.email);
+
+  const [agentActions, setAgentActions] = useState([]);
+
   useEffect(() => {
     setLoading(true);
     const q = query(collection(db, 'issues'), orderBy('createdAt', 'desc'));
@@ -48,6 +63,7 @@ function Dashboard({ user, userStats }) {
         }));
         setIssues(issuesList);
         setLoading(false);
+        runAgentCycle(issuesList); // 👈 agent runs automatically whenever data changes
       },
       (error) => {
         console.error('Error listening to issues:', error);
@@ -83,24 +99,62 @@ function Dashboard({ user, userStats }) {
     return () => window.removeEventListener('keydown', handleEsc);
   }, []);
 
+  useEffect(() => {
+    const q = query(
+      collection(db, 'agentActions'),
+      orderBy('createdAt', 'desc')
+    );
+    const unsub = onSnapshot(q, (snapshot) => {
+      const actions = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).slice(0, 5);
+      setAgentActions(actions);
+    });
+    return () => unsub();
+  }, []);
+
   const handleUpvote = async (issue) => {
-    // Prevent users from upvoting their own issue to farm points
     if (issue.reporterUid && user?.uid === issue.reporterUid) {
-      alert("You can't upvote your own report!");
+      alert("You can't upvote your own issue!");
+      return;
+    }
+
+    if (issue.upvoters?.includes(user?.uid)) {
+      alert("You already upvoted this issue!");
       return;
     }
 
     try {
       const issueRef = doc(db, 'issues', issue.id);
       await updateDoc(issueRef, {
-        upvotes: increment(1)
+        upvotes: increment(1),
+        upvoters: [...(issue.upvoters || []), user.uid]
       });
 
-      // Gamification: the ORIGINAL REPORTER earns points when their issue gets upvoted
       if (issue.reporterUid) {
         await awardPointsForUpvote(issue.reporterUid);
       }
-      // No need to manually refetch — the onSnapshot listener picks this up automatically
+
+      // notification bhejo reporter ko
+      if (issue.reporterUid && issue.reporterUid !== user?.uid) {
+        try {
+          await addDoc(collection(db, 'notifications'), {
+            toUid: issue.reporterUid,
+            message: `👍 ${user.displayName} upvoted your issue at ${issue.location}!`,
+            read: false,
+            createdAt: serverTimestamp()
+          });
+        } catch (err) {
+          console.error('Notification error:', err);
+        }
+      }
+
+      if (issue.reporterUid && issue.reporterUid !== user?.uid) {
+        await addDoc(collection(db, 'notifications'), {
+          toUid: issue.reporterUid,
+          message: `👍 ${user.displayName} upvoted your issue at ${issue.location}!`,
+          read: false,
+          createdAt: serverTimestamp()
+        });
+      }
     } catch (error) {
       console.error('Upvote error:', error);
     }
@@ -124,16 +178,47 @@ function Dashboard({ user, userStats }) {
     } catch (error) {
       console.error('Witness error:', error);
     }
+    if (issue.reporterUid && issue.reporterUid !== user?.uid) {
+      try {
+        await addDoc(collection(db, 'notifications'), {
+          toUid: issue.reporterUid,
+          message: `👀 ${user.displayName} also sees your issue at ${issue.location}!`,
+          read: false,
+          createdAt: serverTimestamp()
+        });
+      } catch (err) {
+        console.error('Notification error:', err);
+      }
+    }
   };
 
   const handleStatusUpdate = async (issue) => {
+    if (!isAdmin) {
+      alert("Only admins can update issue status!");
+      return;
+    }
     const newStatus = STATUS_FLOW[issue.status] || 'Reported';
+
 
     try {
       const issueRef = doc(db, 'issues', issue.id);
       await updateDoc(issueRef, {
         status: newStatus
       });
+
+      // notification bhejo reporter ko
+      if (issue.reporterUid && issue.reporterUid !== user?.uid) {
+        try {
+          await addDoc(collection(db, 'notifications'), {
+            toUid: issue.reporterUid,
+            message: `🔄 Your issue at ${issue.location} status changed to ${newStatus}!`,
+            read: false,
+            createdAt: serverTimestamp()
+          });
+        } catch (err) {
+          console.error('Notification error:', err);
+        }
+      }
 
       // Gamification: bonus points to the reporter only when an issue newly becomes Resolved
       if (newStatus === 'Resolved' && issue.reporterUid) {
@@ -540,6 +625,52 @@ function Dashboard({ user, userStats }) {
           )}
         </div>
 
+        {agentActions.length > 0 && (
+          <div style={{
+            backgroundColor: '#fefce8',
+            border: '1px solid #fde047',
+            borderRadius: '14px',
+            padding: '1.2rem 1.5rem',
+            marginBottom: '1.5rem'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.8rem' }}>
+              <span style={{ fontSize: '1.3rem' }}>🤖</span>
+              <h3 style={{ margin: 0, color: '#854d0e', fontSize: '1.05rem', fontWeight: '800' }}>
+                AI Agent Activity
+              </h3>
+              <span style={{
+                fontSize: '0.7rem',
+                backgroundColor: '#fde047',
+                color: '#713f12',
+                padding: '2px 8px',
+                borderRadius: '10px',
+                fontWeight: '700'
+              }}>
+                AUTONOMOUS
+              </span>
+            </div>
+
+            {agentActions.map(action => (
+              <div key={action.id} style={{
+                display: 'flex',
+                gap: '0.7rem',
+                padding: '0.6rem 0',
+                borderTop: '1px solid #fef9c3'
+              }}>
+                <span style={{ fontSize: '1.1rem' }}>{action.icon}</span>
+                <div>
+                  <p style={{ margin: 0, fontWeight: '700', color: '#713f12', fontSize: '0.88rem' }}>
+                    {action.title}
+                  </p>
+                  <p style={{ margin: '2px 0 0', color: '#a16207', fontSize: '0.8rem' }}>
+                    {action.description}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
         {/* Filters + Sort */}
         <div className="db-filter-card" style={{
           display: 'flex',
@@ -638,6 +769,8 @@ function Dashboard({ user, userStats }) {
             </div>
           )}
         </div>
+
+        
 
         {/* Loading skeleton */}
         {loading && (
@@ -767,39 +900,55 @@ function Dashboard({ user, userStats }) {
                     <button
                       className="db-btn"
                       onClick={() => handleUpvote(issue)}
-                      disabled={user?.uid === issue.reporterUid}
-                      title={user?.uid === issue.reporterUid ? "You can't upvote your own report" : 'Upvote this issue'}
+                      disabled={user?.uid === issue.reporterUid || issue.upvoters?.includes(user?.uid)}
                       style={{
-                        backgroundColor: user?.uid === issue.reporterUid ? '#f3f4f6' : '#eff6ff',
-                        color: user?.uid === issue.reporterUid ? '#9ca3af' : '#2563eb',
-                        border: `1px solid ${user?.uid === issue.reporterUid ? '#e5e7eb' : '#bfdbfe'}`,
-                        padding: '0.4rem 1rem',
-                        borderRadius: '20px',
-                        cursor: user?.uid === issue.reporterUid ? 'not-allowed' : 'pointer',
+                        backgroundColor: (user?.uid === issue.reporterUid || issue.upvoters?.includes(user?.uid)) ? '#f1f5f9' : '#eff6ff',
+                        color: (user?.uid === issue.reporterUid || issue.upvoters?.includes(user?.uid)) ? '#9ca3af' : '#2563eb',
+                        border: `1px solid ${(user?.uid === issue.reporterUid || issue.upvoters?.includes(user?.uid)) ? '#e2e8f0' : '#bfdbfe'}`,
+                        cursor: (user?.uid === issue.reporterUid || issue.upvoters?.includes(user?.uid)) ? 'not-allowed' : 'pointer',
                         fontWeight: 'bold',
-                        fontSize: '0.9rem'
+                        fontSize: '0.9rem',
+                        borderRadius: '20px',
+                        padding: '4px 12px'
                       }}
                     >
                       👍 {issue.upvotes || 0} Upvotes
                     </button>
 
-                    <button
-                      className="db-btn"
-                      onClick={() => handleStatusUpdate(issue)}
-                      style={{
-                        backgroundColor: '#f0fdf4',
-                        color: getStatusColor(issue.status),
-                        border: `1px solid ${getStatusColor(issue.status)}`,
-                        padding: '0.4rem 1rem',
+                    {isAdmin && (
+                      <button
+                        className="db-btn"
+                        onClick={() => handleStatusUpdate(issue)}
+                        style={{
+                          backgroundColor: '#f0fdf4',
+                          color: getStatusColor(issue.status),
+                          border: `1px solid ${getStatusColor(issue.status)}`,
+                          padding: '0.4rem 1rem',
+                          borderRadius: '20px',
+                          cursor: 'pointer',
+                          fontWeight: 'bold',
+                          fontSize: '0.9rem'
+                        }}
+                        title="Click to move to next status"
+                      >
+                        🔄 Mark as {STATUS_FLOW[issue.status] || 'Reported'}
+                      </button>
+                    )}
+
+                    {!isAdmin && (
+                      <span style={{
+                        fontSize: '0.75rem',
+                        color: '#9ca3af',
+                        display: 'flex',
+                        alignItems: 'center',
+                        padding: '4px 10px',
+                        backgroundColor: '#f8fafc',
                         borderRadius: '20px',
-                        cursor: 'pointer',
-                        fontWeight: 'bold',
-                        fontSize: '0.9rem'
-                      }}
-                      title="Click to move to next status"
-                    >
-                      🔄 Mark as {STATUS_FLOW[issue.status] || 'Reported'}
-                    </button>
+                        border: '1px solid #e2e8f0'
+                      }}>
+                        🔒 Admin only
+                      </span>
+                    )}
 
                     <button
                       onClick={() => handleWitness(issue)}
@@ -937,19 +1086,21 @@ function Dashboard({ user, userStats }) {
                   👍 Upvote
                 </button>
 
-                <button
-                  className="db-btn"
-                  onClick={() => handleStatusUpdate(selectedIssue)}
-                  style={{
-                    backgroundColor: '#f0fdf4',
-                    color: getStatusColor(selectedIssue.status),
-                    border: `1px solid ${getStatusColor(selectedIssue.status)}`,
-                    padding: '0.5rem 1.2rem', borderRadius: '20px',
-                    cursor: 'pointer', fontWeight: 'bold', fontSize: '0.9rem'
-                  }}
-                >
-                  🔄 Mark as {STATUS_FLOW[selectedIssue.status] || 'Reported'}
-                </button>
+                {isAdmin && (
+                  <button
+                    className="db-btn"
+                    onClick={() => handleStatusUpdate(selectedIssue)}
+                    style={{
+                      backgroundColor: '#f0fdf4',
+                      color: getStatusColor(selectedIssue.status),
+                      border: `1px solid ${getStatusColor(selectedIssue.status)}`,
+                      padding: '0.5rem 1.2rem', borderRadius: '20px',
+                      cursor: 'pointer', fontWeight: 'bold', fontSize: '0.9rem'
+                    }}
+                  >
+                    🔄 Mark as {STATUS_FLOW[selectedIssue.status] || 'Reported'}
+                  </button>
+                )}
               </div>
             </div>
           </div>

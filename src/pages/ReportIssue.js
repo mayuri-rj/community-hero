@@ -2,8 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from 'react-leaflet';
 import { uploadImageToCloudinary } from '../services/cloudinaryService';
 import { db } from '../firebase/config';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
-import { awardPointsForReport } from '../services/gamificationService';
+import { collection, addDoc, serverTimestamp, getDoc, doc } from 'firebase/firestore';
+import { awardPointsForReport, checkAndNotifyBadge } from '../services/gamificationService';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 
@@ -119,6 +119,16 @@ function ReportIssue({ user }) {
         createdAt: serverTimestamp()
       });
       await awardPointsForReport(user.uid);
+      const userSnap = await getDoc(doc(db, 'users', user.uid));
+      if (userSnap.exists()) {
+        const data = userSnap.data();
+        await checkAndNotifyBadge(
+          user.uid,
+          data.reportsCount || 0,
+          data.points || 0
+        );
+      }
+      setSubmitted(true);
       setSubmitted(true);
     } catch (error) {
       console.error('Submit error:', error);
