@@ -46,26 +46,35 @@ export const getBadgesForUser = (reportsCount = 0, points = 0) => {
  * because it can't race with another write, and it will never wipe out
  * existing points/reportsCount if the doc already exists.
  */
-export const ensureUserDoc = async (user) => {
+export const ensureUserDoc = async (user, role = 'citizen') => {
   if (!user) return;
   const userRef = doc(db, 'users', user.uid);
   const snapshot = await getDoc(userRef);
 
   if (!snapshot.exists()) {
-    // sirf naye user ke liye create karo
+    // naye user ke liye create karo — role bhi saath mein
     await setDoc(userRef, {
       displayName: user.displayName || 'Anonymous',
       name: user.displayName || 'Anonymous',
       photoURL: user.photoURL || null,
       points: 0,
-      reportsCount: 0
+      reportsCount: 0,
+      role: role, // 'citizen' | 'university' | 'industry' | 'admin'
     });
   } else {
-    // existing user ke liye sirf name aur photo update karo
-    await updateDoc(userRef, {
+    // existing user ke liye name/photo update karo
+    const updates = {
       displayName: user.displayName || 'Anonymous',
       photoURL: user.photoURL || null,
-    });
+    };
+
+    // BACKFILL: agar purane user doc mein role field hi nahi hai, add karo
+    const data = snapshot.data();
+    if (!data.role) {
+      updates.role = 'citizen'; // purane citizen users ka default
+    }
+
+    await updateDoc(userRef, updates);
   }
 };
 
@@ -83,7 +92,8 @@ const ensureUserDocExists = async (uid) => {
       points: 0,
       reportsCount: 0,
       displayName: 'Anonymous',
-      photoURL: null
+      photoURL: null,
+      role: 'citizen'
     }, { merge: true });
   }
   return userRef;

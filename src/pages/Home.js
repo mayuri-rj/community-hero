@@ -117,18 +117,18 @@ function Home() {
       </div>
 
       <div style={{
-  backgroundColor: '#eff6ff',
-  border: '1px solid #bfdbfe',
-  borderRadius: '14px',
-  padding: '1rem 1.5rem',
-  margin: '1.5rem auto',
-  maxWidth: '700px',
-  textAlign: 'center'
-}}>
-  <p style={{ margin: 0, color: '#1e3a8a', fontWeight: '700', fontSize: '0.95rem' }}>
-    🧭 How to test: 1️⃣ Login with Google → 2️⃣ View issues on the Map → 3️⃣ Report a new issue with photo/video & location
-  </p>
-</div>
+        backgroundColor: '#eff6ff',
+        border: '1px solid #bfdbfe',
+        borderRadius: '14px',
+        padding: '1rem 1.5rem',
+        margin: '1.5rem auto',
+        maxWidth: '700px',
+        textAlign: 'center'
+      }}>
+        <p style={{ margin: 0, color: '#1e3a8a', fontWeight: '700', fontSize: '0.95rem' }}>
+          🧭 How to test: 1️⃣ Login with Google → 2️⃣ View issues on the Map → 3️⃣ Report a new issue with photo/video & location
+        </p>
+      </div>
 
       {/* Stats Section */}
       <div style={{

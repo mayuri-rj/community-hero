@@ -51,6 +51,48 @@ function ReportIssue({ user }) {
   const [searching, setSearching] = useState(false);
   const searchTimeout = useRef(null);
 
+
+  // 🎤 Voice reporting setup
+  const [isListening, setIsListening] = useState(false);
+  const recognitionRef = useRef(null);
+
+  useEffect(() => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) return;
+
+    const recognition = new SpeechRecognition();
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.lang = 'en-IN';
+
+    recognition.onresult = (event) => {
+      const transcript = event.results[0][0].transcript;
+      setDescription((prev) => (prev ? prev + ' ' + transcript : transcript));
+    };
+
+    recognition.onend = () => setIsListening(false);
+    recognition.onerror = (event) => {
+      console.error('Speech recognition error:', event.error);
+      setIsListening(false);
+    };
+
+    recognitionRef.current = recognition;
+  }, []);
+
+  const toggleListening = () => {
+    if (!recognitionRef.current) {
+      alert('Voice input is not supported in this browser. Try Chrome.');
+      return;
+    }
+    if (isListening) {
+      recognitionRef.current.stop();
+      setIsListening(false);
+    } else {
+      recognitionRef.current.start();
+      setIsListening(true);
+    }
+  };
+
   // Auto search location on typing
   useEffect(() => {
     if (searchTimeout.current) clearTimeout(searchTimeout.current);
@@ -116,8 +158,10 @@ function ReportIssue({ user }) {
         upvotes: 0,
         lat: markerPos.lat,
         lng: markerPos.lng,
+        assignedTo: null,
         createdAt: serverTimestamp()
       });
+
       await awardPointsForReport(user.uid);
       const userSnap = await getDoc(doc(db, 'users', user.uid));
       if (userSnap.exists()) {
@@ -281,10 +325,9 @@ function ReportIssue({ user }) {
             >
               {/* CartoDB Voyager — crisp tiles with road/shop/landmark labels, no API key needed */}
               <TileLayer
-                url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
-                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
-                subdomains="abcd"
-                maxZoom={20}
+                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                maxZoom={19}
               />
               <FlyToLocation coords={searchCoords} />
               <LocationPicker onLocationSelect={handleLocationSelect} />
@@ -301,17 +344,43 @@ function ReportIssue({ user }) {
         </div>
 
         {/* Description */}
-        <div>
-          <label className="label">📝 Description</label>
+        <div style={{ position: 'relative' }}>
           <textarea
             placeholder="Describe the issue briefly..."
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             rows={3}
             className="input-field"
-            style={{ resize: 'vertical' }}
+            style={{ resize: 'vertical', paddingRight: '3rem' }}
           />
+          <button
+            type="button"
+            onClick={toggleListening}
+            title={isListening ? 'Listening... click to stop' : 'Click to speak'}
+            style={{
+              position: 'absolute',
+              right: '0.6rem',
+              top: '0.6rem',
+              background: isListening ? '#dc2626' : '#2563eb',
+              color: '#fff',
+              border: 'none',
+              borderRadius: '50%',
+              width: '36px',
+              height: '36px',
+              cursor: 'pointer',
+              fontSize: '1.1rem',
+              animation: isListening ? 'pulse 1s infinite' : 'none',
+            }}
+          >
+            🎤
+          </button>
         </div>
+
+        {isListening && (
+          <p style={{ fontSize: '0.8rem', color: '#dc2626', marginTop: '0.3rem' }}>
+            🔴 Listening... bolo ab
+          </p>
+        )}
 
         {/* Category */}
         <div>
@@ -329,6 +398,10 @@ function ReportIssue({ user }) {
             <option value="Water Leakage">💧 Water Leakage</option>
             <option value="Damaged Road">🛣️ Damaged Road</option>
             <option value="Encroachment">🚧 Encroachment</option>
+            <option value="Healthcare Issue">🏥 Healthcare Issue</option>
+            <option value="Education Issue">📚 Education Issue</option>
+            <option value="Agriculture/Rural Issue">🌾 Agriculture/Rural Issue</option>
+            <option value="Digital Accessibility Issue">♿ Digital Accessibility Issue</option>
             <option value="Other">❓ Other</option>
           </select>
         </div>

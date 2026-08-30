@@ -11,13 +11,17 @@ import Map from './pages/Map';
 import Login from './pages/Login';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from './firebase/config';
-
+import PartnerAuth from './pages/PartnerAuth';
+import UniversityDashboard from './pages/UniversityDashboard';
+import IndustryDashboard from './pages/IndustryDashboard';
+import ProtectedRoute from './components/ProtectedRoute';
+import PartnerNavbar from './components/PartnerNavbar';
 
 function App() {
   const [user, setUser] = useState(null);
-   const [userStats, setUserStats] = useState(null);
+  const [userStats, setUserStats] = useState(null);
   const [loading, setLoading] = useState(true);
-  
+  const [statsLoading, setStatsLoading] = useState(true);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -33,18 +37,22 @@ function App() {
   useEffect(() => {
     if (!user) {
       setUserStats(null);
+      setStatsLoading(false);
       return;
     }
+    setStatsLoading(true);
     const unsubscribe = onSnapshot(doc(db, 'users', user.uid), (snap) => {
       if (snap.exists()) {
         setUserStats(snap.data());
       }
+      setStatsLoading(false);
     });
     return () => unsubscribe();
   }, [user]);
 
+  const userRole = userStats?.role || null;
 
-  if (loading) {
+  if (loading || (user && statsLoading)) {
     return (
       <div style={{ textAlign: 'center', padding: '4rem' }}>
         <p style={{ fontSize: '1.2rem', color: '#6b7280' }}>Loading... 🔄</p>
@@ -52,18 +60,72 @@ function App() {
     );
   }
 
-  if (!user) {
-    return <Login />;
-  }
+
 
   return (
     <Router>
-      <Navbar user={user} userStats={userStats} />
+      {user && userRole === 'citizen' && <Navbar user={user} userStats={userStats} />}
+      {user && (userRole === 'university' || userRole === 'industry') && (
+        <PartnerNavbar user={user} role={userRole} orgName={userStats?.orgName} />
+      )}
       <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/report" element={<ReportIssue user={user} />} />
-        <Route path="/dashboard" element={<Dashboard user={user} userStats={userStats} />} />
-        <Route path="/map" element={<Map />} />
+        {/* Public / login routes */}
+        <Route path="/login" element={user ? <Home /> : <Login />} />
+        <Route path="/partner-login" element={<PartnerAuth />} />
+
+        {/* Citizen routes — protected */}
+        <Route
+          path="/"
+          element={
+            <ProtectedRoute user={user} userRole={userRole} allowedRoles={['citizen', 'admin']}>
+              <Home />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/report"
+          element={
+            <ProtectedRoute user={user} userRole={userRole} allowedRoles={['citizen', 'admin']}>
+              <ReportIssue user={user} />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/dashboard"
+          element={
+            <ProtectedRoute user={user} userRole={userRole} allowedRoles={['citizen', 'admin']}>
+              <Dashboard user={user} userStats={userStats} />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/map"
+          element={
+            <ProtectedRoute user={user} userRole={userRole} allowedRoles={['citizen', 'admin']}>
+              <Map />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* University — protected */}
+        <Route
+          path="/university"
+          element={
+            <ProtectedRoute user={user} userRole={userRole} allowedRoles={['university', 'admin']}>
+             <UniversityDashboard user={user} userStats={userStats} />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Industry — protected */}
+        <Route
+          path="/industry"
+          element={
+            <ProtectedRoute user={user} userRole={userRole} allowedRoles={['industry', 'admin']}>
+              <IndustryDashboard user={user} userStats={userStats} />
+            </ProtectedRoute>
+          }
+        />
       </Routes>
     </Router>
   );

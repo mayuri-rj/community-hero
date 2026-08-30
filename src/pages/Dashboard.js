@@ -5,7 +5,7 @@ import { awardPointsForUpvote, awardPointsForResolved } from '../services/gamifi
 import { getBadgesForUser } from '../services/gamificationService';
 import { runAgentCycle } from '../services/agentService';
 import { collection, onSnapshot, orderBy, query, doc, updateDoc, increment, addDoc, serverTimestamp } from 'firebase/firestore';
-import { seedDemoData } from '../services/seedDemoData';
+//import { seedDemoData } from '../services/seedDemoData';
 //import { cleanupAndReseed } from '../services/cleanupAndReseed';
 
 //Admin Emails
@@ -63,7 +63,7 @@ function Dashboard({ user, userStats }) {
         }));
         setIssues(issuesList);
         setLoading(false);
-        runAgentCycle(issuesList); // 👈 agent runs automatically whenever data changes
+        runAgentCycle(issuesList);
       },
       (error) => {
         console.error('Error listening to issues:', error);
@@ -89,6 +89,26 @@ function Dashboard({ user, userStats }) {
       unsubscribeUsers();
     };
   }, []);
+
+  // 5-day review deadline check — runs whenever issues list updates
+  useEffect(() => {
+    const checkOverdueReviews = async () => {
+      const now = new Date();
+      const overdue = issues.filter(
+        (i) => i.status === 'Awaiting Reporter Confirmation' &&
+          i.reviewDeadline &&
+          i.reviewDeadline.toDate() < now
+      );
+      for (const issue of overdue) {
+        try {
+          await updateDoc(doc(db, 'issues', issue.id), { status: 'Needs Admin Review' });
+        } catch (err) {
+          console.error('Overdue check error:', err);
+        }
+      }
+    };
+    if (issues.length > 0) checkOverdueReviews();
+  }, [issues]);
 
   // Close modal on Escape key
   useEffect(() => {
@@ -206,6 +226,7 @@ function Dashboard({ user, userStats }) {
         status: newStatus
       });
 
+
       // notification bhejo reporter ko
       if (issue.reporterUid && issue.reporterUid !== user?.uid) {
         try {
@@ -229,6 +250,25 @@ function Dashboard({ user, userStats }) {
       console.error('Status update error:', error);
     }
   };
+
+  const handleConfirmResolution = async (issue, confirmed) => {
+    try {
+      const issueRef = doc(db, 'issues', issue.id);
+
+      if (confirmed) {
+        await updateDoc(issueRef, { status: 'Resolved' });
+        if (issue.reporterUid) {
+          await awardPointsForResolved(issue.reporterUid);
+        }
+      } else {
+        await updateDoc(issueRef, { status: 'In Progress', afterImageUrl: null, reviewDeadline: null });
+      }
+    } catch (err) {
+      console.error('Confirm resolution error:', err);
+      alert('Kuch gadbad hui, dobara try karo.');
+    }
+  };
+
 
   const getSeverityColor = (severity) => {
     if (severity === 'High') return '#dc2626';
@@ -770,7 +810,7 @@ function Dashboard({ user, userStats }) {
           )}
         </div>
 
-        
+
 
         {/* Loading skeleton */}
         {loading && (
@@ -878,6 +918,40 @@ function Dashboard({ user, userStats }) {
                       {issue.status}
                     </span>
                   </div>
+
+                  {issue.status === 'Awaiting Reporter Confirmation' && issue.reporterUid === user?.uid && (
+                    <div style={{ marginTop: '0.8rem', background: '#fefce8', padding: '0.8rem', borderRadius: '8px' }} onClick={(e) => e.stopPropagation()}>
+                      <p style={{ fontWeight: 'bold', marginBottom: '0.5rem' }}>🔍 University claims this is resolved. Confirm karo:</p>
+                      <div style={{ display: 'flex', gap: '0.6rem', marginBottom: '0.6rem' }}>
+                        <div>
+                          <p style={{ fontSize: '0.75rem', color: '#6b7280' }}>Before</p>
+                          <img src={issue.imageUrl} alt="before" style={{ width: '100px', height: '100px', objectFit: 'cover', borderRadius: '6px' }} />
+                        </div>
+                        <div>
+                          <p style={{ fontSize: '0.75rem', color: '#6b7280' }}>After</p>
+                          <img src={issue.afterImageUrl} alt="after" style={{ width: '100px', height: '100px', objectFit: 'cover', borderRadius: '6px' }} />
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => handleConfirmResolution(issue, true)}
+                        style={{ padding: '0.4rem 1rem', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', marginRight: '0.5rem' }}
+                      >
+                        ✅ Yes, it's fixed
+                      </button>
+                      <button
+                        onClick={() => handleConfirmResolution(issue, false)}
+                        style={{ padding: '0.4rem 1rem', background: '#dc2626', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer' }}
+                      >
+                        ❌ No, not fixed
+                      </button>
+                    </div>
+                  )}
+
+                  {issue.status === 'Needs Admin Review' && (
+                    <p style={{ color: '#dc2626', fontWeight: 'bold', marginTop: '0.5rem' }}>
+                      🚩 Needs Admin Review (5-day window expired)
+                    </p>
+                  )}
 
                   <p style={{ margin: '0 0 0.3rem', fontWeight: 'bold', color: '#111827' }}>
                     📍 {issue.location}
