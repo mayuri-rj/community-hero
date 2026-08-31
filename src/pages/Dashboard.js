@@ -6,6 +6,8 @@ import { getBadgesForUser } from '../services/gamificationService';
 import { runAgentCycle } from '../services/agentService';
 import { collection, onSnapshot, orderBy, query, doc, updateDoc, increment, addDoc, serverTimestamp } from 'firebase/firestore';
 import { ADMIN_EMAILS } from '../utils/adminConfig';
+import StatusTimeline from '../components/StatusTimeline';
+
 //import { seedDemoData } from '../services/seedDemoData';
 //import { cleanupAndReseed } from '../services/cleanupAndReseed';
 
@@ -252,7 +254,7 @@ function Dashboard({ user, userStats }) {
       const issueRef = doc(db, 'issues', issue.id);
 
       if (confirmed) {
-        await updateDoc(issueRef, { status: 'Resolved' });
+        await updateDoc(issueRef, { status: 'Resolved', resolvedAt: serverTimestamp() });
         if (issue.reporterUid) {
           await awardPointsForResolved(issue.reporterUid);
         }
@@ -1138,7 +1140,7 @@ function Dashboard({ user, userStats }) {
               <p style={{ margin: '0 0 1.2rem', color: '#9ca3af', fontSize: '0.85rem' }}>
                 Reported by: {selectedIssue.name} · 👍 {selectedIssue.upvotes || 0} upvotes
               </p>
-
+              <StatusTimeline issue={selectedIssue} />
               <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
                 <button
                   className="db-btn"

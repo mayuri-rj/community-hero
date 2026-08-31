@@ -5,6 +5,7 @@ import { uploadImageToCloudinary } from '../services/cloudinaryService';
 import { getDeptForCategory } from '../utils/departmentMapping';
 
 
+
 function UniversityDashboard({ user, userStats }) {
   const [availableIssues, setAvailableIssues] = useState([]);
   const [myIssues, setMyIssues] = useState([]);
@@ -53,6 +54,7 @@ function UniversityDashboard({ user, userStats }) {
         assignedTo: user.uid,
         assignedUniName: user.email,
         status: 'Under University Review',
+        assignedAt: serverTimestamp(), 
       });
     } catch (err) {
       console.error('Accept challenge error:', err);
@@ -84,7 +86,8 @@ function UniversityDashboard({ user, userStats }) {
         status: 'Pending Funding',
         createdAt: serverTimestamp(),
       });
-      await updateDoc(doc(db, 'issues', issueId), { status: 'Proposal Submitted' });
+      await updateDoc(doc(db, 'issues', issueId), { status: 'Proposal Submitted', proposalSubmittedAt: serverTimestamp(), });
+      
       setOpenFormFor(null);
     } catch (err) {
       console.error('Proposal submit error:', err);
@@ -114,6 +117,7 @@ function UniversityDashboard({ user, userStats }) {
         afterImageUrl,
         status: 'Awaiting Reporter Confirmation',
         reviewDeadline: deadline,
+         proofSubmittedAt: serverTimestamp(),
       });
       setAfterImageFile(null);
     } catch (err) {

@@ -54,7 +54,7 @@ function IndustryDashboard({ user }) {
       const fundingRef = await addDoc(collection(db, 'fundings'), fundingData);
 
       await updateDoc(doc(db, 'proposals', proposal.id), { status: 'Funded' });
-      await updateDoc(doc(db, 'issues', proposal.issueId), { status: 'Funded — In Progress' });
+      await updateDoc(doc(db, 'issues', proposal.issueId), { status: 'Funded — In Progress', fundedAt: serverTimestamp(), });
 
       const issueSnap = await getDoc(doc(db, 'issues', proposal.issueId));
       const issueData = issueSnap.exists() ? issueSnap.data() : null;
