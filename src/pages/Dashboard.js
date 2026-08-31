@@ -5,15 +5,11 @@ import { awardPointsForUpvote, awardPointsForResolved } from '../services/gamifi
 import { getBadgesForUser } from '../services/gamificationService';
 import { runAgentCycle } from '../services/agentService';
 import { collection, onSnapshot, orderBy, query, doc, updateDoc, increment, addDoc, serverTimestamp } from 'firebase/firestore';
+import { ADMIN_EMAILS } from '../utils/adminConfig';
 //import { seedDemoData } from '../services/seedDemoData';
 //import { cleanupAndReseed } from '../services/cleanupAndReseed';
 
-//Admin Emails
-const ADMIN_EMAILS = [
-  'jadhavmayuri9870@gmail.com',      // 👈 my email 
-  'associations@blockseblock.com'    // 👈 team member email
 
-];
 
 const STATUS_FLOW = {
   'Reported': 'In Progress',

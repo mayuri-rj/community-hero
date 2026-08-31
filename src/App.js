@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { ensureUserDoc } from './services/gamificationService';
 import { auth } from './firebase/config';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -16,6 +16,9 @@ import UniversityDashboard from './pages/UniversityDashboard';
 import IndustryDashboard from './pages/IndustryDashboard';
 import ProtectedRoute from './components/ProtectedRoute';
 import PartnerNavbar from './components/PartnerNavbar';
+import AdminDashboard from './pages/AdminDashboard';
+import { ADMIN_EMAILS } from './utils/adminConfig';
+
 
 function App() {
   const [user, setUser] = useState(null);
@@ -70,7 +73,7 @@ function App() {
       )}
       <Routes>
         {/* Public / login routes */}
-        <Route path="/login" element={user ? <Home /> : <Login />} />
+        <Route path="/login" element={user ? <Home user={user} /> : <Login />} />
         <Route path="/partner-login" element={<PartnerAuth />} />
 
         {/* Citizen routes — protected */}
@@ -78,9 +81,10 @@ function App() {
           path="/"
           element={
             <ProtectedRoute user={user} userRole={userRole} allowedRoles={['citizen', 'admin']}>
-              <Home />
+              <Home user={user} />
             </ProtectedRoute>
           }
+
         />
         <Route
           path="/report"
@@ -112,7 +116,7 @@ function App() {
           path="/university"
           element={
             <ProtectedRoute user={user} userRole={userRole} allowedRoles={['university', 'admin']}>
-             <UniversityDashboard user={user} userStats={userStats} />
+              <UniversityDashboard user={user} userStats={userStats} />
             </ProtectedRoute>
           }
         />
@@ -124,6 +128,17 @@ function App() {
             <ProtectedRoute user={user} userRole={userRole} allowedRoles={['industry', 'admin']}>
               <IndustryDashboard user={user} userStats={userStats} />
             </ProtectedRoute>
+          }
+        />
+        {/*email check karega*/}
+        <Route
+          path="/admin"
+          element={
+            user && ADMIN_EMAILS.includes(user.email) ? (
+              <AdminDashboard />
+            ) : (
+              <Navigate to="/" replace />
+            )
           }
         />
       </Routes>

@@ -3,7 +3,7 @@ import Notifications from './Notifications';
 import { Link, useLocation } from 'react-router-dom';
 import { auth } from '../firebase/config';
 import { signOut } from 'firebase/auth';
-
+import { ADMIN_EMAILS } from '../utils/adminConfig';
 function Navbar({ user, userStats }) {
   const handleLogout = async () => {
     await signOut(auth);
@@ -19,6 +19,7 @@ function Navbar({ user, userStats }) {
     paddingBottom: '2px',
     transition: 'all 0.2s ease'
   });
+
 
   return (
     <nav style={{
@@ -39,9 +40,16 @@ function Navbar({ user, userStats }) {
 
       <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
         <Link to="/" style={navLinkStyle('/')}>Home</Link>
-        <Link to="/report" style={navLinkStyle('/report')}>Report Issue</Link>
+        {!ADMIN_EMAILS.includes(user?.email) && (
+          <Link to="/report" style={navLinkStyle('/report')}>Report Issue</Link>
+        )}
+        
         <Link to="/dashboard" style={navLinkStyle('/dashboard')}>Dashboard</Link>
         <Link to="/map" style={navLinkStyle('/map')}>Map</Link>
+
+        {ADMIN_EMAILS.includes(user?.email) && (
+          <Link to="/admin" style={navLinkStyle('/admin')}>👑 Admin</Link>
+        )}
 
         {user && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
@@ -59,7 +67,7 @@ function Navbar({ user, userStats }) {
               </span>
             )}
 
-            
+
             {user.photoURL && (
               <img
                 src={user.photoURL}

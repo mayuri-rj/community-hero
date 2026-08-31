@@ -2,8 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { db } from '../firebase/config';
 import { collection, getDocs } from 'firebase/firestore';
+import { ADMIN_EMAILS } from '../utils/adminConfig';
 
-function Home() {
+function Home({ user }) {
   const [stats, setStats] = useState({ total: 0, resolved: 0, inProgress: 0 });
 
   useEffect(() => {
@@ -90,17 +91,19 @@ function Home() {
             Report local issues with AI-powered tracking and help make your city better
           </p>
           <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', flexWrap: 'wrap' }}>
-            <Link to="/report">
-              <button className="btn-primary" style={{
-                backgroundColor: 'white', color: '#1e3a8a',
-                padding: '0.9rem 2.5rem', border: 'none',
-                borderRadius: '50px', fontSize: '1rem',
-                fontWeight: 'bold', cursor: 'pointer',
-                boxShadow: '0 4px 16px rgba(0,0,0,0.2)'
-              }}>
-                🚨 Report an Issue
-              </button>
-            </Link>
+            {!ADMIN_EMAILS.includes(user?.email) && (
+              <Link to="/report">
+                <button className="btn-primary" style={{
+                  backgroundColor: 'white', color: '#1e3a8a',
+                  padding: '0.9rem 2.5rem', border: 'none',
+                  borderRadius: '50px', fontSize: '1rem',
+                  fontWeight: 'bold', cursor: 'pointer',
+                  boxShadow: '0 4px 16px rgba(0,0,0,0.2)'
+                }}>
+                  🚨 Report an Issue
+                </button>
+              </Link>
+            )}
             <Link to="/dashboard">
               <button className="btn-outline" style={{
                 backgroundColor: 'transparent', color: 'white',
@@ -116,19 +119,7 @@ function Home() {
         </div>
       </div>
 
-      <div style={{
-        backgroundColor: '#eff6ff',
-        border: '1px solid #bfdbfe',
-        borderRadius: '14px',
-        padding: '1rem 1.5rem',
-        margin: '1.5rem auto',
-        maxWidth: '700px',
-        textAlign: 'center'
-      }}>
-        <p style={{ margin: 0, color: '#1e3a8a', fontWeight: '700', fontSize: '0.95rem' }}>
-          🧭 How to test: 1️⃣ Login with Google → 2️⃣ View issues on the Map → 3️⃣ Report a new issue with photo/video & location
-        </p>
-      </div>
+
 
       {/* Stats Section */}
       <div style={{
@@ -190,30 +181,32 @@ function Home() {
       </div>
 
       {/* CTA Section */}
-      <div style={{
-        background: 'linear-gradient(135deg, #1e3a8a 0%, #0891b2 100%)',
-        padding: '4rem 2rem', textAlign: 'center'
-      }}>
-        <h2 style={{
-          color: 'white', fontSize: '2rem', fontWeight: '800',
-          margin: '0 0 0.8rem', letterSpacing: '-0.5px'
+      {!ADMIN_EMAILS.includes(user?.email) && (
+        <div style={{
+          background: 'linear-gradient(135deg, #1e3a8a 0%, #0891b2 100%)',
+          padding: '4rem 2rem', textAlign: 'center'
         }}>
-          Ready to make a difference? 🌟
-        </h2>
-        <p style={{ color: 'rgba(255,255,255,0.8)', margin: '0 0 2rem', fontSize: '0.95rem' }}>
-          Join citizens making their communities better
-        </p>
-        <Link to="/report">
-          <button className="shimmer-btn" style={{
-            color: '#1e3a8a', padding: '0.9rem 2.5rem',
-            border: 'none', borderRadius: '50px',
-            fontSize: '1rem', fontWeight: 'bold', cursor: 'pointer',
-            boxShadow: '0 4px 16px rgba(0,0,0,0.2)'
+          <h2 style={{
+            color: 'white', fontSize: '2rem', fontWeight: '800',
+            margin: '0 0 0.8rem', letterSpacing: '-0.5px'
           }}>
-            🚨 Report Your First Issue
-          </button>
-        </Link>
-      </div>
+            Ready to make a difference? 🌟
+          </h2>
+          <p style={{ color: 'rgba(255,255,255,0.8)', margin: '0 0 2rem', fontSize: '0.95rem' }}>
+            Join citizens making their communities better
+          </p>
+          <Link to="/report">
+            <button className="shimmer-btn" style={{
+              color: '#1e3a8a', padding: '0.9rem 2.5rem',
+              border: 'none', borderRadius: '50px',
+              fontSize: '1rem', fontWeight: 'bold', cursor: 'pointer',
+              boxShadow: '0 4px 16px rgba(0,0,0,0.2)'
+            }}>
+              🚨 Report Your First Issue
+            </button>
+          </Link>
+        </div>
+      )}
     </div>
   );
 }
