@@ -3,7 +3,7 @@ import { collection, query, where, onSnapshot, doc, updateDoc, addDoc, serverTim
 import { db } from '../firebase/config';
 import { generateCSRCertificate } from '../services/csrPdfService';
 
-function IndustryDashboard({ user }) {
+function IndustryDashboard({ user, userStats }) {
   const [proposals, setProposals] = useState([]);
   const [myFundings, setMyFundings] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -40,6 +40,10 @@ function IndustryDashboard({ user }) {
       alert('Please enter an amount.');
       return;
     }
+    if (!userStats?.verified) {
+      alert('Your account is pending verification.');
+      return;
+    }
     setSubmitting(true);
     try {
       const fundingData = {
@@ -53,8 +57,18 @@ function IndustryDashboard({ user }) {
       };
       const fundingRef = await addDoc(collection(db, 'fundings'), fundingData);
 
+      await addDoc(collection(db, 'notifications'), {
+        toUid: proposal.uniId,
+        message: `💰 Your proposal has been funded (Rs. ${amount}) by ${user.email}!`,
+        read: false,
+        createdAt: serverTimestamp(),
+      });
+
       await updateDoc(doc(db, 'proposals', proposal.id), { status: 'Funded' });
-      await updateDoc(doc(db, 'issues', proposal.issueId), { status: 'Funded — In Progress', fundedAt: serverTimestamp(), });
+      await updateDoc(doc(db, 'issues', proposal.issueId), {
+        status: 'Funded — In Progress',
+        fundedAt: serverTimestamp(),
+      });
 
       const issueSnap = await getDoc(doc(db, 'issues', proposal.issueId));
       const issueData = issueSnap.exists() ? issueSnap.data() : null;
@@ -72,7 +86,15 @@ function IndustryDashboard({ user }) {
   return (
     <div className="partner-page">
       <div className="partner-header"><h1>🏭 Industry Dashboard</h1></div>
-      <p className="partner-subtitle">Welcome, {user?.email}</p>
+      <p className="partner-subtitle">Welcome, {userStats?.orgName || user?.email}</p>
+
+      {!userStats?.verified && (
+        <div style={{ background: '#fef3c7', border: '1px solid #fbbf24', borderRadius: '10px', padding: '0.9rem 1.1rem', marginBottom: '1.5rem' }}>
+          <p style={{ color: '#92400e', fontWeight: 700, fontSize: '0.9rem' }}>
+            ⏳ Pending Verification — an admin needs to approve your account before you can fund proposals.
+          </p>
+        </div>
+      )}
 
       <h2 className="section-title">
         💰 My Fundings <span className="section-count">{myFundings.length}</span>
@@ -81,9 +103,7 @@ function IndustryDashboard({ user }) {
       {myFundings.map((f) => (
         <div key={f.id} className="partner-card">
           <p><strong>Amount:</strong> {f.amount}</p>
-          <span className="badge badge-green" style={{ marginTop: '0.4rem', display: 'inline-block' }}>
-            {f.status}
-          </span>
+          <span className="badge badge-green" style={{ marginTop: '0.4rem', display: 'inline-block' }}>{f.status}</span>
         </div>
       ))}
 
@@ -114,7 +134,7 @@ function IndustryDashboard({ user }) {
               <button className="btn btn-secondary" onClick={() => setOpenFormFor(null)}>Cancel</button>
             </div>
           ) : (
-            <button className="btn btn-danger" style={{ marginTop: '0.6rem' }} onClick={() => openFundForm(p.id)}>
+            <button className="btn btn-danger" style={{ marginTop: '0.6rem' }} onClick={() => openFundForm(p.id)} disabled={!userStats?.verified}>
               Fund This
             </button>
           )}

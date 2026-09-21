@@ -54,7 +54,7 @@ function UniversityDashboard({ user, userStats }) {
         assignedTo: user.uid,
         assignedUniName: user.email,
         status: 'Under University Review',
-        assignedAt: serverTimestamp(), 
+        assignedAt: serverTimestamp(),
       });
     } catch (err) {
       console.error('Accept challenge error:', err);
@@ -87,7 +87,7 @@ function UniversityDashboard({ user, userStats }) {
         createdAt: serverTimestamp(),
       });
       await updateDoc(doc(db, 'issues', issueId), { status: 'Proposal Submitted', proposalSubmittedAt: serverTimestamp(), });
-      
+
       setOpenFormFor(null);
     } catch (err) {
       console.error('Proposal submit error:', err);
@@ -117,7 +117,7 @@ function UniversityDashboard({ user, userStats }) {
         afterImageUrl,
         status: 'Awaiting Reporter Confirmation',
         reviewDeadline: deadline,
-         proofSubmittedAt: serverTimestamp(),
+        proofSubmittedAt: serverTimestamp(),
       });
       setAfterImageFile(null);
     } catch (err) {
@@ -130,7 +130,10 @@ function UniversityDashboard({ user, userStats }) {
   const hasProposal = (issueId) => myProposals.some((p) => p.issueId === issueId);
 
   const matchingIssues = availableIssues.filter(
-    (issue) => getDeptForCategory(issue.aiCategory) === userStats?.specialization
+    (issue) =>
+      issue.status !== 'Pending Review' &&
+      issue.status !== 'Rejected' &&
+      getDeptForCategory(issue.aiCategory) === userStats?.specialization
   );
 
   return (

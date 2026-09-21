@@ -1,6 +1,7 @@
 import React from 'react';
 import { auth } from '../firebase/config';
 import { signOut } from 'firebase/auth';
+import Notifications from './Notifications';
 
 function PartnerNavbar({ user, role, orgName }) {
     const handleLogout = async () => {
@@ -25,6 +26,7 @@ function PartnerNavbar({ user, role, orgName }) {
             </h1>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
+                <Notifications user={user} />
                 <span style={{ color: 'white', fontSize: '0.9rem', fontWeight: '500' }}>
                     {orgName || user?.email}
                 </span>

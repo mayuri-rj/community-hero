@@ -43,12 +43,12 @@ function Navbar({ user, userStats }) {
         {!ADMIN_EMAILS.includes(user?.email) && (
           <Link to="/report" style={navLinkStyle('/report')}>Report Issue</Link>
         )}
-        
+
         <Link to="/dashboard" style={navLinkStyle('/dashboard')}>Dashboard</Link>
         <Link to="/map" style={navLinkStyle('/map')}>Map</Link>
 
         {ADMIN_EMAILS.includes(user?.email) && (
-          <Link to="/admin" style={navLinkStyle('/admin')}>👑 Admin</Link>
+          <Link to="/admin" style={navLinkStyle('/admin')}>🏛️ Govt. Dashboard</Link>
         )}
 
         {user && (

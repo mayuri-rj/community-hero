@@ -37,7 +37,7 @@ function LocationPicker({
   onLocationSelect,
   height = '250px',
   zoom = 13,
-  center = [19.0760, 72.8777] // Mumbai default
+  center = [23.3441, 85.3096] // Ranchi, Jharkhand default
 }) {
   const mapCenter = lat && lng ? [lat, lng] : center;
 
