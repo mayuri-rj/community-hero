@@ -44,9 +44,11 @@ input:focus, textarea:focus, select:focus {
 /* ===== Partner Dashboard Design System ===== */
 
 .partner-page {
-  max-width: 960px;
+  max-width: 100%;
+  width: 100%;
   margin: 0 auto;
-  padding: 2rem 1.5rem;
+  padding: 2rem;
+  box-sizing: border-box;
 }
 
 .partner-header {

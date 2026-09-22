@@ -912,19 +912,6 @@ function Dashboard({ user, userStats }) {
                           </button>
                         )}
 
-                        {isAdmin && (
-                          <button
-                            className="db-btn"
-                            onClick={() => handleStatusUpdate(issue)}
-                            style={{
-                              backgroundColor: '#f0fdf4', color: getStatusColor(issue.status),
-                              border: `1.5px solid ${getStatusColor(issue.status)}`, padding: '0.4rem 1rem',
-                              borderRadius: '20px', cursor: 'pointer', fontWeight: '700', fontSize: '0.82rem'
-                            }}
-                          >
-                            🔄 Set {STATUS_FLOW[issue.status] || 'Reported'}
-                          </button>
-                        )}
                       </div>
                     </div>
                   </div>
@@ -992,118 +979,122 @@ function Dashboard({ user, userStats }) {
               </div>
             )}
 
-            {/* AI Insights Card */}
-            <div className="db-panel" style={{ padding: '1.3rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                <h3 style={{ color: '#0f172a', margin: 0, fontSize: '1rem', fontWeight: '800' }}>
-                  🤖 AI Insights
-                </h3>
-                <button
-                  className="db-btn"
-                  onClick={async () => {
-                    setInsightsLoading(true);
-                    const result = await generateInsights(issues);
-                    setInsights(result);
-                    setInsightsLoading(false);
-                  }}
-                  style={{
-                    backgroundColor: '#eff6ff', color: '#2563eb',
-                    border: '1.5px solid #bfdbfe', padding: '0.4rem 0.9rem',
-                    borderRadius: '20px', cursor: 'pointer', fontSize: '0.78rem', fontWeight: '700'
-                  }}
-                >
-                  {insightsLoading ? '⏳ Analyzing...' : '✨ Analyze'}
-                </button>
-              </div>
-
-              {insightsLoading && (
-                <div style={{ textAlign: 'center', padding: '1.2rem', color: '#64748b', fontSize: '0.85rem' }}>
-                  🤖 AI is analyzing city patterns...
-                </div>
-              )}
-
-              {insights && !insightsLoading && (
-                <div>
-                  <p style={{
-                    backgroundColor: '#eff6ff', color: '#1d4ed8', padding: '0.7rem 0.9rem',
-                    borderRadius: '10px', fontSize: '0.82rem', fontWeight: '600', margin: '0 0 0.8rem', lineHeight: 1.5
-                  }}>
-                    📊 {insights.summary}
-                  </p>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    {insights.insights?.map((insight, i) => (
-                      <div key={i} style={{
-                        display: 'flex', alignItems: 'flex-start', gap: '8px', padding: '0.7rem',
-                        backgroundColor: '#f8fafc', borderRadius: '10px', border: '1px solid #e2e8f0'
-                      }}>
-                        <span style={{ fontSize: '1.2rem' }}>{insight.icon}</span>
-                        <div>
-                          <p style={{ margin: '0 0 2px', fontWeight: '700', fontSize: '0.82rem', color: '#0f172a' }}>
-                            {insight.title}
-                          </p>
-                          <p style={{ margin: 0, fontSize: '0.78rem', color: '#64748b', lineHeight: 1.4 }}>
-                            {insight.description}
-                          </p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {!insights && !insightsLoading && (
-                <p style={{ color: '#94a3b8', fontSize: '0.82rem', margin: 0, textAlign: 'center', padding: '0.6rem 0' }}>
-                  Click "Analyze" to generate AI trend and cluster reports.
-                </p>
-              )}
-            </div>
-
-            {/* Autonomous AI Agent Feed */}
-            {agentActions.length > 0 && (
-              <div className="db-panel" style={{
-                backgroundColor: '#fffbeb', border: '1px solid #fde047', padding: '1.3rem'
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.8rem' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                    <span style={{ fontSize: '1.2rem' }}>⚡</span>
-                    <h3 style={{ margin: 0, color: '#854d0e', fontSize: '0.95rem', fontWeight: '800' }}>
-                      AI Agent Activity
+            {isAdmin && (
+              <>
+                {/* AI Insights Card */}
+                <div className="db-panel" style={{ padding: '1.3rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                    <h3 style={{ color: '#0f172a', margin: 0, fontSize: '1rem', fontWeight: '800' }}>
+                      🤖 AI Insights
                     </h3>
+                    <button
+                      className="db-btn"
+                      onClick={async () => {
+                        setInsightsLoading(true);
+                        const result = await generateInsights(issues);
+                        setInsights(result);
+                        setInsightsLoading(false);
+                      }}
+                      style={{
+                        backgroundColor: '#eff6ff', color: '#2563eb',
+                        border: '1.5px solid #bfdbfe', padding: '0.4rem 0.9rem',
+                        borderRadius: '20px', cursor: 'pointer', fontSize: '0.78rem', fontWeight: '700'
+                      }}
+                    >
+                      {insightsLoading ? '⏳ Analyzing...' : '✨ Analyze'}
+                    </button>
                   </div>
-                  <span style={{
-                    fontSize: '0.68rem', backgroundColor: '#fde047', color: '#713f12',
-                    padding: '2px 7px', borderRadius: '8px', fontWeight: '800'
-                  }}>
-                    LIVE
-                  </span>
-                </div>
 
-                <div style={{ display: 'flex', flexDirection: 'column' }}>
-                  {agentActions.map(action => (
-                    <div key={action.id} style={{
-                      display: 'flex', gap: '0.6rem', padding: '0.55rem 0',
-                      borderTop: '1px solid rgba(253, 224, 71, 0.4)'
-                    }}>
-                      <span style={{ fontSize: '1rem' }}>{action.icon}</span>
-                      <div>
-                        <p style={{ margin: 0, fontWeight: '700', color: '#713f12', fontSize: '0.82rem' }}>
-                          {action.title}
-                        </p>
-                        <p style={{ margin: '2px 0 0', color: '#a16207', fontSize: '0.75rem' }}>
-                          {action.description}
-                        </p>
+                  {insightsLoading && (
+                    <div style={{ textAlign: 'center', padding: '1.2rem', color: '#64748b', fontSize: '0.85rem' }}>
+                      🤖 AI is analyzing city patterns...
+                    </div>
+                  )}
+
+                  {insights && !insightsLoading && (
+                    <div>
+                      <p style={{
+                        backgroundColor: '#eff6ff', color: '#1d4ed8', padding: '0.7rem 0.9rem',
+                        borderRadius: '10px', fontSize: '0.82rem', fontWeight: '600', margin: '0 0 0.8rem', lineHeight: 1.5
+                      }}>
+                        📊 {insights.summary}
+                      </p>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        {insights.insights?.map((insight, i) => (
+                          <div key={i} style={{
+                            display: 'flex', alignItems: 'flex-start', gap: '8px', padding: '0.7rem',
+                            backgroundColor: '#f8fafc', borderRadius: '10px', border: '1px solid #e2e8f0'
+                          }}>
+                            <span style={{ fontSize: '1.2rem' }}>{insight.icon}</span>
+                            <div>
+                              <p style={{ margin: '0 0 2px', fontWeight: '700', fontSize: '0.82rem', color: '#0f172a' }}>
+                                {insight.title}
+                              </p>
+                              <p style={{ margin: 0, fontSize: '0.78rem', color: '#64748b', lineHeight: 1.4 }}>
+                                {insight.description}
+                              </p>
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     </div>
-                  ))}
+                  )}
+
+                  {!insights && !insightsLoading && (
+                    <p style={{ color: '#94a3b8', fontSize: '0.82rem', margin: 0, textAlign: 'center', padding: '0.6rem 0' }}>
+                      Click "Analyze" to generate AI trend and cluster reports.
+                    </p>
+                  )}
                 </div>
-              </div>
+
+                {/* Autonomous AI Agent Feed */}
+                {agentActions.length > 0 && (
+                  <div className="db-panel" style={{
+                    backgroundColor: '#fffbeb', border: '1px solid #fde047', padding: '1.3rem'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.8rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                        <span style={{ fontSize: '1.2rem' }}>⚡</span>
+                        <h3 style={{ margin: 0, color: '#854d0e', fontSize: '0.95rem', fontWeight: '800' }}>
+                          AI Agent Activity
+                        </h3>
+                      </div>
+                      <span style={{
+                        fontSize: '0.68rem', backgroundColor: '#fde047', color: '#713f12',
+                        padding: '2px 7px', borderRadius: '8px', fontWeight: '800'
+                      }}>
+                        LIVE
+                      </span>
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                      {agentActions.map(action => (
+                        <div key={action.id} style={{
+                          display: 'flex', gap: '0.6rem', padding: '0.55rem 0',
+                          borderTop: '1px solid rgba(253, 224, 71, 0.4)'
+                        }}>
+                          <span style={{ fontSize: '1rem' }}>{action.icon}</span>
+                          <div>
+                            <p style={{ margin: 0, fontWeight: '700', color: '#713f12', fontSize: '0.82rem' }}>
+                              {action.title}
+                            </p>
+                            <p style={{ margin: '2px 0 0', color: '#a16207', fontSize: '0.75rem' }}>
+                              {action.description}
+                            </p>
+                          </div>
+
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
             )}
 
           </div>
 
         </div>
       </div>
-
       {/* ───── Detail Modal ───── */}
       {selectedIssue && (
         <div className="db-modal-overlay" onClick={() => setSelectedIssue(null)}>

@@ -18,7 +18,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 import PartnerNavbar from './components/PartnerNavbar';
 import AdminDashboard from './pages/AdminDashboard';
 import { ADMIN_EMAILS } from './utils/adminConfig';
-
+import { isSignupInProgress } from './utils/signupFlag';
 
 function App() {
   const [user, setUser] = useState(null);
@@ -29,7 +29,7 @@ function App() {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
-      if (currentUser) {
+      if (currentUser && !isSignupInProgress()) {
         ensureUserDoc(currentUser);
       }
       setLoading(false);

@@ -6,9 +6,11 @@ import {
 } from 'firebase/auth';
 import { auth } from '../firebase/config';
 import { ensureUserDoc } from '../services/gamificationService';
-import { doc, updateDoc } from 'firebase/firestore';
+import { doc, updateDoc, setDoc } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import { DEPARTMENTS } from '../utils/departmentMapping';
+import { setSignupInProgress } from '../utils/signupFlag';
+
 
 
 function PartnerAuth() {
@@ -21,9 +23,11 @@ function PartnerAuth() {
     const [error, setError] = useState('');
     const [submitting, setSubmitting] = useState(false);
     const [specialization, setSpecialization] = useState(DEPARTMENTS[0]);
+    const [partnerType, setPartnerType] = useState('Industry');
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+        setSignupInProgress(true); 
         setError('');
         setSubmitting(true);
 
@@ -32,12 +36,11 @@ function PartnerAuth() {
             let userCredential;
             if (mode === 'signup') {
                 userCredential = await createUserWithEmailAndPassword(auth, email, password);
-                await ensureUserDoc(userCredential.user, role);
-                // Save the organization name too
-                await updateDoc(doc(db, 'users', userCredential.user.uid), {
+                await userCredential.user.getIdToken(true); // force refresh auth token
+                await ensureUserDoc(userCredential.user, role, {
                     orgName: orgName,
-                    verified: false,
                     specialization: role === 'university' ? specialization : null,
+                    partnerType: role === 'industry' ? partnerType : null,
                 });
             } else {
                 userCredential = await signInWithEmailAndPassword(auth, email, password);
@@ -45,9 +48,24 @@ function PartnerAuth() {
             // App.js ka onAuthStateChanged khud navigate handle karega userRole ke hisaab se
             navigate('/');
         } catch (err) {
-            setError(err.message);
+            console.log('SIGNUP ERROR:', err.message, err.code);
+            // Firebase ke technical error code ko friendly message mein badlo
+            if (err.code === 'auth/email-already-in-use') {
+                setError('This email is already registered. Please log in instead.');
+            } else if (err.code === 'auth/weak-password') {
+                setError('Password should be at least 6 characters.');
+            } else if (err.code === 'auth/invalid-email') {
+                setError('Please enter a valid email address.');
+            } else if (err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
+                setError('Incorrect email or password.');
+            } else if (err.code === 'auth/user-not-found') {
+                setError('No account found with this email.');
+            } else {
+                setError('Something went wrong. Please try again.');
+            }
         } finally {
             setSubmitting(false);
+            setSignupInProgress(false);
         }
 
     };
@@ -70,6 +88,20 @@ function PartnerAuth() {
                 >
                     🎓 University
                 </button>
+                {mode === 'signup' && role === 'industry' && (
+                    <select
+                        value={partnerType}
+                        onChange={(e) => setPartnerType(e.target.value)}
+                        required
+                        style={{ width: '100%', padding: '0.6rem', marginBottom: '0.8rem' }}
+                    >
+                        <option value="Industry">Industry</option>
+                        <option value="Startup">Startup</option>
+                        <option value="MSME">MSME</option>
+                        <option value="NGO">NGO</option>
+                        <option value="Research Institution">Research Institution</option>
+                    </select>
+                )}
                 <button
                     type="button"
                     onClick={() => setRole('industry')}

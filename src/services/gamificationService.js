@@ -46,23 +46,31 @@ export const getBadgesForUser = (reportsCount = 0, points = 0) => {
  * because it can't race with another write, and it will never wipe out
  * existing points/reportsCount if the doc already exists.
  */
-export const ensureUserDoc = async (user, role = 'citizen') => {
-  if (!user) return;
+export const ensureUserDoc = async (user, role = 'citizen', extraData = {}) => {
+  console.log('ensureUserDoc CALLED with:', user?.uid, role, extraData);
+  if (!user) {
+    console.log('ensureUserDoc: NO USER, returning early');
+    return;
+  }
   const userRef = doc(db, 'users', user.uid);
   const snapshot = await getDoc(userRef);
+  console.log('ensureUserDoc: document exists?', snapshot.exists());
 
   if (!snapshot.exists()) {
-    // naye user ke liye create karo — role bhi saath mein
+    console.log('ensureUserDoc: creating new document now...');
     await setDoc(userRef, {
       displayName: user.displayName || 'Anonymous',
       name: user.displayName || 'Anonymous',
       photoURL: user.photoURL || null,
       points: 0,
       reportsCount: 0,
-      role: role, // 'citizen' | 'university' | 'industry' | 'admin'
+      role: role,
+      verified: role !== 'citizen' ? false : true,
+      ...extraData,
     });
+    console.log('ensureUserDoc: DOCUMENT CREATED SUCCESSFULLY');
   } else {
-    // existing user ke liye name/photo update karo
+    console.log('ensureUserDoc: document already exists, going to update branch');
     const updates = {
       displayName: user.displayName || 'Anonymous',
       photoURL: user.photoURL || null,
