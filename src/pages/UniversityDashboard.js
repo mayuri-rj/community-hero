@@ -733,12 +733,52 @@ const UnivIssueCard = ({ issue, onAccept, onSubmitProposal, onUploadProof, isOpe
             <p style={{ fontSize: '0.9rem', fontWeight: 600, marginBottom: '0.75rem', margin: 0, color: '#9a3412' }}>
               📸 Upload proof photo to mark this resolved:
             </p>
-            <input
-              type="file"
-              accept="image/*"
-              onChange={(e) => setAfterImageFile(e.target.files[0])}
-              style={{ marginBottom: '0.75rem' }}
-            />
+            <div style={{ display: 'flex', gap: '0.6rem', marginBottom: '0.75rem' }}>
+              <label style={{
+                flex: 1,
+                textAlign: 'center',
+                background: 'linear-gradient(135deg, #f59e0b, #fbbf24)',
+                color: 'white',
+                padding: '0.6rem',
+                borderRadius: '10px',
+                fontSize: '0.85rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+              }}>
+                📷 Open Camera
+                <input
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  onChange={(e) => setAfterImageFile(e.target.files[0])}
+                  style={{ display: 'none' }}
+                />
+              </label>
+              <label style={{
+                flex: 1,
+                textAlign: 'center',
+                background: '#e5e7eb',
+                color: '#374151',
+                padding: '0.6rem',
+                borderRadius: '10px',
+                fontSize: '0.85rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+              }}>
+                🖼️ Choose from Gallery
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => setAfterImageFile(e.target.files[0])}
+                  style={{ display: 'none' }}
+                />
+              </label>
+            </div>
+            {afterImageFile && (
+              <p style={{ fontSize: '0.8rem', color: '#9a3412', marginBottom: '0.5rem' }}>
+                ✅ Selected: {afterImageFile.name}
+              </p>
+            )}
             <button
               style={{
                 background: `linear-gradient(135deg, ${UNIV.warning}, ${UNIV.warningLight})`,
@@ -1080,7 +1120,7 @@ function UniversityDashboard({ user, userStats }) {
               isOpen={openFormFor === issue.id}
               onCancel={() => setOpenFormFor(null)}
               onOpen={() => setOpenFormFor(issue.id)}
-              
+
             />
           </div>
         ))}

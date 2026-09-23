@@ -739,6 +739,48 @@ function ReportIssue({ user }) {
                 )}
               </div>
 
+              <div style={{ display: 'flex', gap: '0.6rem', marginTop: '0.6rem' }}>
+                <label style={{
+                  flex: 1,
+                  textAlign: 'center',
+                  background: 'linear-gradient(135deg, #2563eb, #3b82f6)',
+                  color: 'white',
+                  padding: '0.6rem',
+                  borderRadius: '10px',
+                  fontSize: '0.85rem',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                }}>
+                  📷 Open Camera
+                  <input
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    onChange={handleImageChange}
+                    style={{ display: 'none' }}
+                  />
+                </label>
+                <label style={{
+                  flex: 1,
+                  textAlign: 'center',
+                  background: '#e5e7eb',
+                  color: '#374151',
+                  padding: '0.6rem',
+                  borderRadius: '10px',
+                  fontSize: '0.85rem',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                }}>
+                  🖼️ Choose from Gallery
+                  <input
+                    type="file"
+                    accept="image/*,video/*"
+                    onChange={handleImageChange}
+                    style={{ display: 'none' }}
+                  />
+                </label>
+              </div>
+
               {loading && (
                 <div style={{
                   backgroundColor: '#eff6ff', borderRadius: '12px',
