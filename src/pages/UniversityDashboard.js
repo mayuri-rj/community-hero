@@ -347,7 +347,6 @@ const UnivEmptyState = ({ icon, title, message, subtext }) => (
       <p style={{
         fontSize: '1.1rem',
         color: UNIV.textSecondary,
-        margin: '0 0 0.5rem',
         maxWidth: '400px',
         margin: '0 auto 0.5rem'
       }}>

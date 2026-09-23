@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { collection, query, where, onSnapshot, doc, updateDoc, getDocs } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import { getDeptForCategory, DEPARTMENTS } from '../utils/departmentMapping';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+
 
 // Government portal professional color palette
 const GOV = {
@@ -477,6 +479,7 @@ function AdminDashboard() {
   const [deptStats, setDeptStats] = useState([]);
   const [completionRate, setCompletionRate] = useState(0);
   const [pendingIssues, setPendingIssues] = useState([]);
+  const [districtStats, setDistrictStats] = useState([]);
 
   // Pending verification list
   useEffect(() => {
@@ -541,6 +544,16 @@ function AdminDashboard() {
         .filter(([, v]) => v.total > 0)
         .map(([dept, v]) => ({ dept, ...v }));
       setDeptStats(deptStatsArray);
+
+      const districtCounts = {};
+      allIssues.forEach((issue) => {
+        if (!issue.district) return;
+        districtCounts[issue.district] = (districtCounts[issue.district] || 0) + 1;
+      });
+      const districtStatsArray = Object.entries(districtCounts)
+        .map(([district, count]) => ({ district, count }))
+        .sort((a, b) => b.count - a.count);
+      setDistrictStats(districtStatsArray);
 
       const totalResolved = allIssues.filter((i) => i.status === 'Resolved').length;
       setCompletionRate(allIssues.length > 0 ? Math.round((totalResolved / allIssues.length) * 100) : 0);
@@ -654,6 +667,39 @@ function AdminDashboard() {
         <GovEmptyState message="No data yet." subMessage="Statistics will appear once issues are reported." />
       )}
       <DeptStatsList stats={deptStats} />
+      {deptStats.length > 0 && (
+        <div style={{ background: 'white', borderRadius: '12px', padding: '1rem', marginTop: '1rem', marginBottom: '1rem' }}>
+          <ResponsiveContainer width="100%" height={280}>
+            <BarChart data={deptStats} margin={{ top: 10, right: 20, left: 0, bottom: 40 }}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="dept" angle={-30} textAnchor="end" interval={0} fontSize={11} />
+              <YAxis allowDecimals={false} />
+              <Tooltip />
+              <Bar dataKey="total" fill={GOV.primaryLight} name="Total Reports" radius={[6, 6, 0, 0]} />
+              <Bar dataKey="resolved" fill={GOV.success} name="Resolved" radius={[6, 6, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+
+      {/* District-wise Distribution */}
+      <SectionTitle>🗺️ District-wise Distribution</SectionTitle>
+      {districtStats.length === 0 && (
+        <GovEmptyState message="No data yet." subMessage="District data will appear once issues are reported." />
+      )}
+      {districtStats.length > 0 && (
+        <div style={{ background: 'white', borderRadius: '12px', padding: '1rem', marginBottom: '1rem' }}>
+          <ResponsiveContainer width="100%" height={280}>
+            <BarChart data={districtStats} margin={{ top: 10, right: 20, left: 0, bottom: 40 }}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="district" angle={-30} textAnchor="end" interval={0} fontSize={11} />
+              <YAxis allowDecimals={false} />
+              <Tooltip />
+              <Bar dataKey="count" fill={GOV.warning} name="Reports" radius={[6, 6, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      )}
 
       {/* Top Universities */}
       <SectionTitle>🏆 Top Universities (by challenges resolved)</SectionTitle>
