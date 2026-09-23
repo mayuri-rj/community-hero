@@ -47,6 +47,7 @@ function ReportIssue({ user }) {
   const [loading, setLoading] = useState(false);
   const [markerPos, setMarkerPos] = useState(null);
   const [searching, setSearching] = useState(false);
+  const [district, setDistrict] = useState('');
   const [dragOver, setDragOver] = useState(false);
   const searchTimeout = useRef(null);
 
@@ -151,6 +152,10 @@ function ReportIssue({ user }) {
       alert('Please write a proper description (at least 15 characters) explaining the issue.');
       return;
     }
+    if (!district) {
+      alert('Please select a district!');
+      return;
+    }
     if (!location || !image) {
       alert('Please fill location and upload an image!');
       return;
@@ -166,7 +171,7 @@ function ReportIssue({ user }) {
       const mediaType = result?.type || 'image';
       await addDoc(collection(db, 'issues'), {
         name: user.displayName, reporterUid: user.uid, photoURL: user.photoURL,
-        location, description, imageUrl, mediaType,
+        district, location, description, imageUrl, mediaType,
         aiCategory: aiCategory || 'Other', aiSeverity: aiSeverity || 'Medium',
         aiDescription, status: 'Pending Review', pendingReview: true,
         rejectedCount: 0, upvotes: 0,
@@ -506,6 +511,26 @@ function ReportIssue({ user }) {
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               <div>
+                <label className="label">District</label>
+                <select
+                  value={district}
+                  onChange={(e) => setDistrict(e.target.value)}
+                  className="input-field"
+                  style={{ marginBottom: '1rem' }}
+                >
+                  <option value="">Select district...</option>
+                  {[
+                    'Bokaro', 'Chatra', 'Deoghar', 'Dhanbad', 'Dumka', 'East Singhbhum',
+                    'Garhwa', 'Giridih', 'Godda', 'Gumla', 'Hazaribagh', 'Jamtara',
+                    'Khunti', 'Koderma', 'Latehar', 'Lohardaga', 'Pakur', 'Palamu',
+                    'Ramgarh', 'Ranchi', 'Sahebganj', 'Seraikela Kharsawan',
+                    'Simdega', 'West Singhbhum'
+                  ].map((d) => (
+                    <option key={d} value={d}>{d}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
                 <label className="label">Search Location</label>
                 <input
                   type="text"
@@ -751,7 +776,7 @@ function ReportIssue({ user }) {
                   fontWeight: 700,
                   cursor: 'pointer',
                 }}>
-                  📷 Open Camera
+                  📷 Take Photo
                   <input
                     type="file"
                     accept="image/*"

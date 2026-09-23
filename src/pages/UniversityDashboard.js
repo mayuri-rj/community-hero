@@ -379,6 +379,33 @@ const UnivIssueCard = ({ issue, onAccept, onSubmitProposal, onUploadProof, isOpe
   const [expectedDeliverables, setExpectedDeliverables] = useState('');
   const [afterImageFile, setAfterImageFile] = useState(null);
   const [uploadingProof, setUploadingProof] = useState(null);
+  const [surveyDone, setSurveyDone] = useState(issue.proposal?.surveyDone || false);
+  const [prototypeBuilt, setPrototypeBuilt] = useState(issue.proposal?.prototypeBuilt || false);
+  const [pilotTested, setPilotTested] = useState(issue.proposal?.pilotTested || false);
+  const [ipReference, setIpReference] = useState(issue.proposal?.ipReference || '');
+  const [savingIpRef, setSavingIpRef] = useState(false);
+
+  const handleMilestoneToggle = async (field, value) => {
+    if (!issue.proposal?.id) return;
+    try {
+      await updateDoc(doc(db, 'proposals', issue.proposal.id), { [field]: value });
+    } catch (err) {
+      console.error('Milestone update error:', err);
+      alert('Could not save milestone, please try again.');
+    }
+  };
+
+  const handleSaveIpRef = async () => {
+    if (!issue.proposal?.id) return;
+    setSavingIpRef(true);
+    try {
+      await updateDoc(doc(db, 'proposals', issue.proposal.id), { ipReference });
+    } catch (err) {
+      console.error('IP reference save error:', err);
+      alert('Could not save, please try again.');
+    }
+    setSavingIpRef(false);
+  };
 
 
   const handleSubmitProposal = async () => {
@@ -719,6 +746,81 @@ const UnivIssueCard = ({ issue, onAccept, onSubmitProposal, onUploadProof, isOpe
           >
             Express Interest & Accept
           </button>
+        )}
+
+        {/* Milestone Checklist + IP/Patent Reference */}
+        {issue.status === 'Funded — In Progress' && (
+          <div style={{
+            marginTop: '1rem',
+            background: '#f0fdf4',
+            border: '1px solid #bbf7d0',
+            borderRadius: '12px',
+            padding: '1.25rem'
+          }}>
+            <p style={{ fontSize: '0.9rem', fontWeight: 600, marginBottom: '0.75rem', margin: 0, color: '#166534' }}>
+              ✅ Project Milestones:
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.75rem', marginBottom: '1rem' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', color: '#166534', cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={surveyDone}
+                  onChange={(e) => { setSurveyDone(e.target.checked); handleMilestoneToggle('surveyDone', e.target.checked); }}
+                />
+                Survey done
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', color: '#166534', cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={prototypeBuilt}
+                  onChange={(e) => { setPrototypeBuilt(e.target.checked); handleMilestoneToggle('prototypeBuilt', e.target.checked); }}
+                />
+                Prototype built
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', color: '#166534', cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={pilotTested}
+                  onChange={(e) => { setPilotTested(e.target.checked); handleMilestoneToggle('pilotTested', e.target.checked); }}
+                />
+                Pilot tested
+              </label>
+            </div>
+            <p style={{ fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.4rem', color: '#166534' }}>
+              IP / Patent Reference (optional):
+            </p>
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <input
+                type="text"
+                value={ipReference}
+                onChange={(e) => setIpReference(e.target.value)}
+                placeholder="e.g. Patent filing ref no."
+                style={{
+                  flex: 1,
+                  padding: '0.5rem 0.75rem',
+                  borderRadius: '8px',
+                  border: '1px solid #bbf7d0',
+                  fontSize: '0.85rem'
+                }}
+              />
+              <button
+                onClick={handleSaveIpRef}
+                disabled={savingIpRef}
+                style={{
+                  background: '#16a34a',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  padding: '0.5rem 1rem',
+                  fontWeight: 600,
+                  fontSize: '0.8rem',
+                  cursor: 'pointer'
+                }}
+              >
+                {savingIpRef ? '...' : 'Save'}
+              </button>
+            </div>
+          </div>
         )}
 
         {/* Resolution Proof Section */}
