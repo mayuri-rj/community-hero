@@ -383,6 +383,16 @@ const UnivIssueCard = ({ issue, onAccept, onSubmitProposal, onUploadProof, isOpe
   const [pilotTested, setPilotTested] = useState(issue.proposal?.pilotTested || false);
   const [ipReference, setIpReference] = useState(issue.proposal?.ipReference || '');
   const [savingIpRef, setSavingIpRef] = useState(false);
+  const [editingIpRef, setEditingIpRef] = useState(false);
+
+  useEffect(() => {
+    if (issue.proposal) {
+      setSurveyDone(issue.proposal.surveyDone || false);
+      setPrototypeBuilt(issue.proposal.prototypeBuilt || false);
+      setPilotTested(issue.proposal.pilotTested || false);
+      setIpReference(issue.proposal.ipReference || '');
+    }
+  }, [issue.proposal?.surveyDone, issue.proposal?.prototypeBuilt, issue.proposal?.pilotTested, issue.proposal?.ipReference]);
 
   const handleMilestoneToggle = async (field, value) => {
     if (!issue.proposal?.id) return;
@@ -399,6 +409,7 @@ const UnivIssueCard = ({ issue, onAccept, onSubmitProposal, onUploadProof, isOpe
     setSavingIpRef(true);
     try {
       await updateDoc(doc(db, 'proposals', issue.proposal.id), { ipReference });
+      alert('✅ IP/Patent reference saved!');
     } catch (err) {
       console.error('IP reference save error:', err);
       alert('Could not save, please try again.');
@@ -788,37 +799,60 @@ const UnivIssueCard = ({ issue, onAccept, onSubmitProposal, onUploadProof, isOpe
             <p style={{ fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.4rem', color: '#166534' }}>
               IP / Patent Reference (optional):
             </p>
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
-              <input
-                type="text"
-                value={ipReference}
-                onChange={(e) => setIpReference(e.target.value)}
-                placeholder="e.g. Patent filing ref no."
-                style={{
-                  flex: 1,
-                  padding: '0.5rem 0.75rem',
-                  borderRadius: '8px',
-                  border: '1px solid #bbf7d0',
-                  fontSize: '0.85rem'
-                }}
-              />
-              <button
-                onClick={handleSaveIpRef}
-                disabled={savingIpRef}
-                style={{
-                  background: '#16a34a',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '8px',
-                  padding: '0.5rem 1rem',
-                  fontWeight: 600,
-                  fontSize: '0.8rem',
-                  cursor: 'pointer'
-                }}
-              >
-                {savingIpRef ? '...' : 'Save'}
-              </button>
-            </div>
+            {issue.proposal?.ipReference && !editingIpRef ? (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
+                <span style={{ fontSize: '0.85rem', color: '#166534', fontWeight: 600 }}>
+                  📄 {issue.proposal.ipReference}
+                </span>
+                <button
+                  onClick={() => setEditingIpRef(true)}
+                  style={{
+                    background: 'transparent',
+                    color: '#166534',
+                    border: '1px solid #166534',
+                    borderRadius: '8px',
+                    padding: '0.3rem 0.7rem',
+                    fontWeight: 600,
+                    fontSize: '0.75rem',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Edit
+                </button>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <input
+                  type="text"
+                  value={ipReference}
+                  onChange={(e) => setIpReference(e.target.value)}
+                  placeholder="e.g. Patent filing ref no."
+                  style={{
+                    flex: 1,
+                    padding: '0.5rem 0.75rem',
+                    borderRadius: '8px',
+                    border: '1px solid #bbf7d0',
+                    fontSize: '0.85rem'
+                  }}
+                />
+                <button
+                  onClick={async () => { await handleSaveIpRef(); setEditingIpRef(false); }}
+                  disabled={savingIpRef}
+                  style={{
+                    background: '#16a34a',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '8px',
+                    padding: '0.5rem 1rem',
+                    fontWeight: 600,
+                    fontSize: '0.8rem',
+                    cursor: 'pointer'
+                  }}
+                >
+                  {savingIpRef ? '...' : 'Save'}
+                </button>
+              </div>
+            )}
           </div>
         )}
 
