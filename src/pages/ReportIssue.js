@@ -2,11 +2,24 @@ import React, { useState, useEffect, useRef } from 'react';
 import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from 'react-leaflet';
 import { uploadImageToCloudinary } from '../services/cloudinaryService';
 import { db } from '../firebase/config';
-import { collection, addDoc, serverTimestamp, getDoc, doc } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, getDoc, doc, getDocs, query, where } from 'firebase/firestore';
 import { awardPointsForReport, checkAndNotifyBadge } from '../services/gamificationService';
 import { analyzeIssueImage } from '../services/geminiService';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
+
+// Haversine formula — distance between two lat/lng points in meters
+function getDistanceMeters(lat1, lng1, lat2, lng2) {
+  const R = 6371000;
+  const toRad = (deg) => (deg * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
 
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
@@ -108,6 +121,12 @@ function ReportIssue({ user }) {
             lat: report.lat,
             lng: report.lng,
             assignedTo: null,
+            createdAt: serverTimestamp(),
+          });
+          await addDoc(collection(db, 'notifications'), {
+            toUid: 'admin-broadcast',
+            message: `📋 New issue reported (synced from offline): ${report.district || 'Unknown district'} — ${report.aiCategory || 'Other'}.`,
+            read: false,
             createdAt: serverTimestamp(),
           });
         } catch (err) {
@@ -271,6 +290,34 @@ function ReportIssue({ user }) {
       const result = await uploadImageToCloudinary(image);
       const imageUrl = result?.url || null;
       const mediaType = result?.type || 'image';
+
+      // Duplicate detection: same district + same category + within ~500m
+      let possibleDuplicateOf = null;
+      try {
+        const dupQuery = query(
+          collection(db, 'issues'),
+          where('district', '==', district),
+          where('aiCategory', '==', aiCategory || 'Other')
+        );
+        const dupSnap = await getDocs(dupQuery);
+        for (const d of dupSnap.docs) {
+          const existing = d.data();
+          if (existing.lat && existing.lng) {
+            const dist = getDistanceMeters(markerPos.lat, markerPos.lng, existing.lat, existing.lng);
+            if (dist <= 500) {
+              possibleDuplicateOf = d.id;
+              break;
+            }
+          }
+        }
+      } catch (dupErr) {
+        console.error('Duplicate check failed (non-blocking):', dupErr);
+      }
+
+      if (possibleDuplicateOf) {
+        alert('⚠️ A similar issue was already reported nearby. Your report will still be submitted and linked as a possible duplicate for admin review.');
+      }
+
       await addDoc(collection(db, 'issues'), {
         name: user.displayName, reporterUid: user.uid, photoURL: user.photoURL,
         district, reporterType, location, description, imageUrl, mediaType,
@@ -278,7 +325,14 @@ function ReportIssue({ user }) {
         aiDescription, status: 'Pending Review', pendingReview: true,
         rejectedCount: 0, upvotes: 0,
         lat: markerPos.lat, lng: markerPos.lng,
+        possibleDuplicateOf,
         assignedTo: null, createdAt: serverTimestamp()
+      });
+      await addDoc(collection(db, 'notifications'), {
+        toUid: 'admin-broadcast',
+        message: `📋 New issue reported: ${district || 'Unknown district'} — ${aiCategory || 'Other'}.`,
+        read: false,
+        createdAt: serverTimestamp(),
       });
       await awardPointsForReport(user.uid);
       const userSnap = await getDoc(doc(db, 'users', user.uid));

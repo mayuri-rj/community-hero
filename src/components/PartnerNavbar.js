@@ -26,7 +26,7 @@ function PartnerNavbar({ user, role, orgName }) {
             </h1>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
-                <Notifications user={user} />
+                <Notifications user={user} broadcastKey={role === 'industry' ? 'industry-broadcast' : null} />
                 <span style={{ color: 'white', fontSize: '0.9rem', fontWeight: '500' }}>
                     {orgName || user?.email}
                 </span>

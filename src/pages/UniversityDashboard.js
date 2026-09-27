@@ -1081,240 +1081,246 @@ const UnivAvailableCard = ({ issue, onAccept, isVerified, expertise }) => {
         </button>
       </div>
     </div>
-      );
+  );
+}
+
+
+function UniversityDashboard({ user, userStats }) {
+  const [availableIssues, setAvailableIssues] = useState([]);
+  const [myIssues, setMyIssues] = useState([]);
+  const [myProposals, setMyProposals] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const [openFormFor, setOpenFormFor] = useState(null);
+
+  useEffect(() => {
+    const q = query(collection(db, 'issues'), where('assignedTo', '==', null));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      setAvailableIssues(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
+      setLoading(false);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    if (!user) return;
+    const q = query(collection(db, 'issues'), where('assignedTo', '==', user.uid));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      setMyIssues(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
+    });
+    return () => unsubscribe();
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) return;
+    const q = query(collection(db, 'proposals'), where('uniId', '==', user.uid));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      setMyProposals(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
+    });
+    return () => unsubscribe();
+  }, [user]);
+
+  const handleAccept = async (issueId) => {
+    try {
+      await updateDoc(doc(db, 'issues', issueId), {
+        assignedTo: user.uid,
+        assignedUniName: user.email,
+        status: 'Under University Review',
+        assignedAt: serverTimestamp(),
+      });
+    } catch (err) {
+      console.error('Accept challenge error:', err);
+      alert('Something went wrong, please try again.');
     }
+  };
 
-
-  function UniversityDashboard({ user, userStats }) {
-    const [availableIssues, setAvailableIssues] = useState([]);
-    const [myIssues, setMyIssues] = useState([]);
-    const [myProposals, setMyProposals] = useState([]);
-    const [loading, setLoading] = useState(true);
-
-    const [openFormFor, setOpenFormFor] = useState(null);
-
-    useEffect(() => {
-      const q = query(collection(db, 'issues'), where('assignedTo', '==', null));
-      const unsubscribe = onSnapshot(q, (snapshot) => {
-        setAvailableIssues(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
-        setLoading(false);
+  const handleSubmitProposal = async (issueId, proposalData) => {
+    setLoading(true);
+    try {
+      await addDoc(collection(db, 'proposals'), {
+        issueId,
+        uniId: user.uid,
+        uniEmail: user.email,
+        ...proposalData,
+        status: 'Pending Funding',
+        createdAt: serverTimestamp(),
       });
-      return () => unsubscribe();
-    }, []);
-
-    useEffect(() => {
-      if (!user) return;
-      const q = query(collection(db, 'issues'), where('assignedTo', '==', user.uid));
-      const unsubscribe = onSnapshot(q, (snapshot) => {
-        setMyIssues(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
+      await updateDoc(doc(db, 'issues', issueId), { status: 'Proposal Submitted', proposalSubmittedAt: serverTimestamp(), });
+      await addDoc(collection(db, 'notifications'), {
+        toUid: 'industry-broadcast',
+        message: `💡 New proposal ready for funding: "${(proposalData.solution || 'Untitled proposal').slice(0, 60)}" — submitted by ${userStats?.orgName || user.email}.`,
+        read: false,
+        createdAt: serverTimestamp(),
       });
-      return () => unsubscribe();
-    }, [user]);
+    } catch (err) {
+      console.error('Proposal submit error:', err);
+      alert('Proposal submission failed, please try again.');
+    }
+    setLoading(false);
+  };
 
-    useEffect(() => {
-      if (!user) return;
-      const q = query(collection(db, 'proposals'), where('uniId', '==', user.uid));
-      const unsubscribe = onSnapshot(q, (snapshot) => {
-        setMyProposals(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
+  const submitResolutionProof = async (issueId, imageFile) => {
+    setLoading(true);
+    try {
+      const result = await uploadImageToCloudinary(imageFile);
+      const afterImageUrl = result?.url || null;
+      const deadline = new Date();
+      deadline.setDate(deadline.getDate() + 5);
+
+      await updateDoc(doc(db, 'issues', issueId), {
+        afterImageUrl,
+        status: 'Awaiting Reporter Confirmation',
+        reviewDeadline: deadline,
+        proofSubmittedAt: serverTimestamp(),
       });
-      return () => unsubscribe();
-    }, [user]);
+    } catch (err) {
+      console.error('Proof upload error:', err);
+      alert('Proof upload failed, please try again.');
+    }
+    setLoading(false);
+  };
 
-    const handleAccept = async (issueId) => {
-      try {
-        await updateDoc(doc(db, 'issues', issueId), {
-          assignedTo: user.uid,
-          assignedUniName: user.email,
-          status: 'Under University Review',
-          assignedAt: serverTimestamp(),
-        });
-      } catch (err) {
-        console.error('Accept challenge error:', err);
-        alert('Something went wrong, please try again.');
-      }
-    };
+  const hasProposal = (issueId) => myProposals.some((p) => p.issueId === issueId);
+  const getProposalForIssue = (issueId) => myProposals.find((p) => p.issueId === issueId);
 
-    const handleSubmitProposal = async (issueId, proposalData) => {
-      setLoading(true);
-      try {
-        await addDoc(collection(db, 'proposals'), {
-          issueId,
-          uniId: user.uid,
-          uniEmail: user.email,
-          ...proposalData,
-          status: 'Pending Funding',
-          createdAt: serverTimestamp(),
-        });
-        await updateDoc(doc(db, 'issues', issueId), { status: 'Proposal Submitted', proposalSubmittedAt: serverTimestamp(), });
-      } catch (err) {
-        console.error('Proposal submit error:', err);
-        alert('Proposal submission failed, please try again.');
-      }
-      setLoading(false);
-    };
+  const matchingIssues = availableIssues.filter(
+    (issue) =>
+      issue.status !== 'Pending Review' &&
+      issue.status !== 'Rejected' &&
+      getDeptForCategory(issue.aiCategory) === userStats?.specialization
+  );
 
-    const submitResolutionProof = async (issueId, imageFile) => {
-      setLoading(true);
-      try {
-        const result = await uploadImageToCloudinary(imageFile);
-        const afterImageUrl = result?.url || null;
-        const deadline = new Date();
-        deadline.setDate(deadline.getDate() + 5);
+  const inProgressIssues = myIssues.filter(i => i.status === 'Funded — In Progress' || i.status === 'Awaiting Reporter Confirmation');
+  const pendingProposalIssues = myIssues.filter(i => i.status === 'Proposal Submitted');
 
-        await updateDoc(doc(db, 'issues', issueId), {
-          afterImageUrl,
-          status: 'Awaiting Reporter Confirmation',
-          reviewDeadline: deadline,
-          proofSubmittedAt: serverTimestamp(),
-        });
-      } catch (err) {
-        console.error('Proof upload error:', err);
-        alert('Proof upload failed, please try again.');
-      }
-      setLoading(false);
-    };
-
-    const hasProposal = (issueId) => myProposals.some((p) => p.issueId === issueId);
-    const getProposalForIssue = (issueId) => myProposals.find((p) => p.issueId === issueId);
-
-    const matchingIssues = availableIssues.filter(
-      (issue) =>
-        issue.status !== 'Pending Review' &&
-        issue.status !== 'Rejected' &&
-        getDeptForCategory(issue.aiCategory) === userStats?.specialization
-    );
-
-    const inProgressIssues = myIssues.filter(i => i.status === 'Funded — In Progress' || i.status === 'Awaiting Reporter Confirmation');
-    const pendingProposalIssues = myIssues.filter(i => i.status === 'Proposal Submitted');
-
-    return (
-      <div className="partner-page" style={{
-        background: UNIV.bgGradient,
-        minHeight: '100vh',
-        paddingTop: '2rem',
-        paddingBottom: '2rem',
+  return (
+    <div className="partner-page" style={{
+      background: UNIV.bgGradient,
+      minHeight: '100vh',
+      paddingTop: '2rem',
+      paddingBottom: '2rem',
+      width: '100%',
+      boxSizing: 'border-box'
+    }}>
+      <div style={{
         width: '100%',
+        maxWidth: 'none',
+        padding: '0 2rem',
         boxSizing: 'border-box'
       }}>
-        <div style={{
-          width: '100%',
-          maxWidth: 'none',
-          padding: '0 2rem',
-          boxSizing: 'border-box'
-        }}>
-          {/* Official University Header */}
-          <UnivHeader user={user} userStats={userStats} />
+        {/* Official University Header */}
+        <UnivHeader user={user} userStats={userStats} />
 
-          {/* Quick Stats Overview */}
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-            gap: '1.5rem',
-            marginBottom: '3rem'
-          }}>
-            <UnivStatCard
-              title="Accepted Challenges"
-              value={myIssues.length}
-              color={UNIV.primary}
-              icon="🎯"
-              subtitle="Challenges accepted by your university"
-            />
-            <UnivStatCard
-              title="Under Review"
-              value={pendingProposalIssues.length}
-              color={UNIV.warning}
-              icon="⏳"
-              subtitle="Proposals awaiting review"
-            />
-            <UnivStatCard
-              title="In Progress"
-              value={inProgressIssues.length}
-              color={UNIV.success}
-              icon="✅"
-              subtitle="Funded and active challenges"
+        {/* Quick Stats Overview */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+          gap: '1.5rem',
+          marginBottom: '3rem'
+        }}>
+          <UnivStatCard
+            title="Accepted Challenges"
+            value={myIssues.length}
+            color={UNIV.primary}
+            icon="🎯"
+            subtitle="Challenges accepted by your university"
+          />
+          <UnivStatCard
+            title="Under Review"
+            value={pendingProposalIssues.length}
+            color={UNIV.warning}
+            icon="⏳"
+            subtitle="Proposals awaiting review"
+          />
+          <UnivStatCard
+            title="In Progress"
+            value={inProgressIssues.length}
+            color={UNIV.success}
+            icon="✅"
+            subtitle="Funded and active challenges"
+          />
+        </div>
+
+        {/* My Accepted Challenges Section */}
+        <UnivSectionHeader icon="🎯" count={myIssues.length}>
+          My Projects
+        </UnivSectionHeader>
+
+        {myIssues.length === 0 && (
+          <UnivEmptyState
+            icon="🎓"
+            title="No challenges accepted yet"
+            message="Browse available challenges below to get started!"
+            subtext="Accept challenges from your department to begin working on community issues."
+          />
+        )}
+
+        {myIssues.map((issue) => (
+          <div key={issue.id} style={{ marginBottom: '1rem' }}>
+            <UnivIssueCard
+              issue={{
+                ...issue,
+                id: issue.id,
+                hasProposal: hasProposal(issue.id),
+                proposal: getProposalForIssue(issue.id)
+              }}
+              onAccept={handleAccept}
+              onSubmitProposal={handleSubmitProposal}
+              onUploadProof={submitResolutionProof}
+              isOpen={openFormFor === issue.id}
+              onCancel={() => setOpenFormFor(null)}
+              onOpen={() => setOpenFormFor(issue.id)}
+
             />
           </div>
+        ))}
 
-          {/* My Accepted Challenges Section */}
-          <UnivSectionHeader icon="🎯" count={myIssues.length}>
-            My Projects
-          </UnivSectionHeader>
+        {/* Available Challenges Section */}
+        <UnivSectionHeader icon="🔍" count={matchingIssues.length}>
+          Available Challenges
+        </UnivSectionHeader>
 
-          {myIssues.length === 0 && (
-            <UnivEmptyState
-              icon="🎓"
-              title="No challenges accepted yet"
-              message="Browse available challenges below to get started!"
-              subtext="Accept challenges from your department to begin working on community issues."
-            />
-          )}
-
-          {myIssues.map((issue) => (
-            <div key={issue.id} style={{ marginBottom: '1rem' }}>
-              <UnivIssueCard
-                issue={{
-                  ...issue,
-                  id: issue.id,
-                  hasProposal: hasProposal(issue.id),
-                  proposal: getProposalForIssue(issue.id)
-                }}
-                onAccept={handleAccept}
-                onSubmitProposal={handleSubmitProposal}
-                onUploadProof={submitResolutionProof}
-                isOpen={openFormFor === issue.id}
-                onCancel={() => setOpenFormFor(null)}
-                onOpen={() => setOpenFormFor(issue.id)}
-
-              />
-            </div>
-          ))}
-
-          {/* Available Challenges Section */}
-          <UnivSectionHeader icon="🔍" count={matchingIssues.length}>
-            Available Challenges
-          </UnivSectionHeader>
-
-          {loading && (
+        {loading && (
+          <div style={{
+            background: UNIV.cardBg,
+            borderRadius: '16px',
+            padding: '3rem',
+            textAlign: 'center',
+            boxShadow: UNIV.shadow
+          }}>
             <div style={{
-              background: UNIV.cardBg,
-              borderRadius: '16px',
-              padding: '3rem',
-              textAlign: 'center',
-              boxShadow: UNIV.shadow
-            }}>
-              <div style={{
-                width: '60px',
-                height: '60px',
-                borderRadius: '50%',
-                border: `4px solid ${UNIV.bgGradient}`,
-                borderTop: `4px solid ${UNIV.primary}`,
-                animation: 'spin 1s linear infinite',
-                margin: '0 auto 1rem'
-              }} />
-              <p style={{ color: UNIV.textSecondary, fontSize: '1rem' }}>Loading available challenges...</p>
-            </div>
-          )}
+              width: '60px',
+              height: '60px',
+              borderRadius: '50%',
+              border: `4px solid ${UNIV.bgGradient}`,
+              borderTop: `4px solid ${UNIV.primary}`,
+              animation: 'spin 1s linear infinite',
+              margin: '0 auto 1rem'
+            }} />
+            <p style={{ color: UNIV.textSecondary, fontSize: '1rem' }}>Loading available challenges...</p>
+          </div>
+        )}
 
-          {!loading && matchingIssues.length === 0 && (
-            <UnivEmptyState
-              icon="✅"
-              title="No open challenges match your department"
-              message="All challenges in your department have been accepted or completed!"
-              subtext="Check back later for new challenges in your area of expertise."
+        {!loading && matchingIssues.length === 0 && (
+          <UnivEmptyState
+            icon="✅"
+            title="No open challenges match your department"
+            message="All challenges in your department have been accepted or completed!"
+            subtext="Check back later for new challenges in your area of expertise."
+          />
+        )}
+
+        {matchingIssues.map((issue) => (
+          <div key={issue.id} style={{ marginBottom: '1rem' }}>
+            <UnivAvailableCard
+              issue={{ ...issue, id: issue.id }}
+              onAccept={handleAccept}
+              isVerified={userStats?.verified}
+              expertise={userStats?.expertise}
             />
-          )}
-
-          {matchingIssues.map((issue) => (
-            <div key={issue.id} style={{ marginBottom: '1rem' }}>
-              <UnivAvailableCard
-                issue={{ ...issue, id: issue.id }}
-                onAccept={handleAccept}
-                isVerified={userStats?.verified}
-                expertise={userStats?.expertise}
-              />
-            </div>
-                   ))}
-        </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

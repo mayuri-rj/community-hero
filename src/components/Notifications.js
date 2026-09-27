@@ -2,13 +2,19 @@ import React, { useState, useEffect, useRef } from 'react';
 import { db } from '../firebase/config';
 import { collection, query, where, onSnapshot, orderBy, updateDoc, doc } from 'firebase/firestore';
 
-function Notifications({ user }) {
+function Notifications({ user, broadcastKey, hidePersonal }) {
   const [notifications, setNotifications] = useState([]);
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef(null);
 
+  const [personalNotifs, setPersonalNotifs] = useState([]);
+  const [broadcastNotifs, setBroadcastNotifs] = useState([]);
+
   useEffect(() => {
-    if (!user) return;
+    if (!user || hidePersonal) {
+      setPersonalNotifs([]);
+      return;
+    }
 
     const q = query(
       collection(db, 'notifications'),
@@ -17,15 +23,36 @@ function Notifications({ user }) {
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const notifList = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-      setNotifications(notifList);
+      setPersonalNotifs(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
 
     return () => unsubscribe();
-  }, [user]);
+  }, [user, hidePersonal]);
+
+  useEffect(() => {
+    if (!broadcastKey) {
+      setBroadcastNotifs([]);
+      return;
+    }
+    const q = query(
+      collection(db, 'notifications'),
+      where('toUid', '==', broadcastKey),
+      orderBy('createdAt', 'desc')
+    );
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      setBroadcastNotifs(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+    return () => unsubscribe();
+  }, [broadcastKey]);
+
+  useEffect(() => {
+    const combined = [...personalNotifs, ...broadcastNotifs].sort((a, b) => {
+      const aTime = a.createdAt?.toMillis?.() || 0;
+      const bTime = b.createdAt?.toMillis?.() || 0;
+      return bTime - aTime;
+    });
+    setNotifications(combined);
+  }, [personalNotifs, broadcastNotifs]);
 
   // Close dropdown when clicking outside
   useEffect(() => {

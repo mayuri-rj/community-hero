@@ -64,7 +64,6 @@ function App() {
   }
 
 
-
   return (
     <Router>
       {user && userRole === 'citizen' && <Navbar user={user} userStats={userStats} />}
@@ -135,7 +134,7 @@ function App() {
           path="/admin"
           element={
             user && ADMIN_EMAILS.includes(user.email) ? (
-              <AdminDashboard />
+              <AdminDashboard user={user} />
             ) : (
               <Navigate to="/" replace />
             )

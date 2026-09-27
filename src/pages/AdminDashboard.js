@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import { collection, query, where, onSnapshot, doc, updateDoc, getDocs } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, doc, updateDoc, getDocs, getDoc } from 'firebase/firestore'; 
 import { db } from '../firebase/config';
 import { getDeptForCategory, DEPARTMENTS } from '../utils/departmentMapping';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import Notifications from '../components/Notifications';
 
 
 // Government portal professional color palette
@@ -28,7 +29,7 @@ const GOV = {
 };
 
 // Professional government header component
-const GovHeader = ({ title, subtitle }) => (
+const GovHeader = ({ title, subtitle, rightSlot }) => (
   <div style={{
     background: `linear-gradient(135deg, ${GOV.primary} 0%, ${GOV.primaryLight} 50%, ${GOV.secondary} 100%)`,
     borderRadius: '16px',
@@ -49,6 +50,11 @@ const GovHeader = ({ title, subtitle }) => (
       pointerEvents: 'none'
     }} />
     <div style={{ position: 'relative', zIndex: 1 }}>
+      {rightSlot && (
+        <div style={{ position: 'absolute', top: 0, right: 0 }}>
+          {rightSlot}
+        </div>
+      )}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
           <h1 style={{
@@ -88,6 +94,11 @@ const GovHeader = ({ title, subtitle }) => (
           </div>
         </div>
       </div>
+      {rightSlot && (
+        <div style={{ position: 'absolute', top: '1.2rem', right: '1.2rem', zIndex: 2 }}>
+          {rightSlot}
+        </div>
+      )}
     </div>
   </div>
 );
@@ -308,6 +319,46 @@ const PartnerCard = ({ partner }) => (
   </div>
 );
 
+// Shows which existing report a flagged duplicate is similar to
+const DuplicateOfLine = ({ originalId }) => {
+  const [original, setOriginal] = useState(null);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const snap = await getDoc(doc(db, 'issues', originalId));
+        if (cancelled) return;
+        if (snap.exists()) setOriginal(snap.data());
+        else setFailed(true);
+      } catch (err) {
+        console.error('Could not load original issue:', err);
+        if (!cancelled) setFailed(true);
+      }
+    };
+    load();
+    return () => { cancelled = true; };
+  }, [originalId]);
+
+  if (failed) {
+    return (
+      <p style={{ margin: '0.4rem 0 0', fontSize: '0.78rem', color: GOV.textMuted }}>
+        Similar to report ID: {originalId}
+      </p>
+    );
+  }
+  if (!original) return null;
+
+  const snippet = (original.description || '').slice(0, 70);
+  return (
+    <p style={{ margin: '0.4rem 0 0', fontSize: '0.78rem', color: GOV.textMuted, lineHeight: 1.4 }}>
+      Similar to: 📍 {original.location || 'Unknown location'} — "{snippet}
+      {(original.description || '').length > 70 ? '...' : ''}" · Status: {original.status}
+    </p>
+  );
+};
+
 // Pending review issue card
 const IssueReviewCard = ({ issue }) => (
   <div style={{
@@ -354,6 +405,22 @@ const IssueReviewCard = ({ issue }) => (
             >
               🗺️ View exact location ({issue.lat.toFixed(4)}, {issue.lng.toFixed(4)})
             </a>
+          )}
+          {issue.possibleDuplicateOf && (
+            <div style={{ marginTop: '0.5rem' }}>
+              <span style={{
+                background: '#fff3e0',
+                color: GOV.warningLight,
+                padding: '0.3rem 0.7rem',
+                borderRadius: '8px',
+                fontSize: '0.75rem',
+                fontWeight: 700,
+                border: `1px solid ${GOV.warningLight}40`,
+              }}>
+                ⚠️ Possible Duplicate
+              </span>
+              <DuplicateOfLine originalId={issue.possibleDuplicateOf} />
+            </div>
           )}
         </div>
         <div style={{ display: 'flex', gap: '0.6rem' }}>
@@ -471,7 +538,7 @@ const DeptStatsList = ({ stats }) => (
 );
 
 
-function AdminDashboard() {
+function AdminDashboard({ user }) {
   const [pendingPartners, setPendingPartners] = useState([]);
   const [uniRankings, setUniRankings] = useState([]);
   const [industryRankings, setIndustryRankings] = useState([]);
@@ -481,6 +548,7 @@ function AdminDashboard() {
   const [pendingIssues, setPendingIssues] = useState([]);
   const [districtStats, setDistrictStats] = useState([]);
   const [reporterTypeStats, setReporterTypeStats] = useState([]);
+  const [ipStats, setIpStats] = useState({ count: 0, items: [] });
 
   // Pending verification list
   useEffect(() => {
@@ -514,6 +582,15 @@ function AdminDashboard() {
         }))
         .sort((a, b) => b.count - a.count);
       setUniRankings(uniList);
+
+      const ipItems = proposalsSnap.docs
+        .map((d) => ({ id: d.id, ...d.data() }))
+        .filter((p) => p.ipReference && p.ipReference.trim() !== '')
+        .map((p) => ({
+          reference: p.ipReference,
+          university: usersMap[p.uniId]?.orgName || usersMap[p.uniId]?.displayName || 'Unknown University',
+        }));
+      setIpStats({ count: ipItems.length, items: ipItems });
 
       const fundingsSnap = await getDocs(collection(db, 'fundings'));
       const industryTotals = {};
@@ -551,7 +628,7 @@ function AdminDashboard() {
         if (!issue.district) return;
         districtCounts[issue.district] = (districtCounts[issue.district] || 0) + 1;
       });
-            const districtStatsArray = Object.entries(districtCounts)
+      const districtStatsArray = Object.entries(districtCounts)
         .map(([district, count]) => ({ district, count }))
         .sort((a, b) => b.count - a.count);
       setDistrictStats(districtStatsArray);
@@ -604,6 +681,11 @@ function AdminDashboard() {
     } catch (err) { console.error('Reject error:', err); }
   };
 
+  const scrollToSection = (id) => {
+    const el = document.getElementById(id);
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
   return (
     <div className="partner-page" style={{ maxWidth: '1200px' }}>
       {/* Government Portal Header */}
@@ -611,6 +693,49 @@ function AdminDashboard() {
         title="Government Department Dashboard"
         subtitle="Department of Higher & Technical Education — Partner verification & platform analytics"
       />
+
+      {/* Sticky Top Navigation */}
+      <div style={{
+        position: 'sticky',
+        top: 0,
+        zIndex: 50,
+        background: 'white',
+        borderRadius: '12px',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+        padding: '0.6rem',
+        marginBottom: '1.25rem',
+        display: 'flex',
+        gap: '0.5rem',
+        overflowX: 'auto',
+        whiteSpace: 'nowrap',
+      }}>
+        {[
+          { id: 'section-verification', label: '⏳ Verification', count: pendingPartners.length },
+          { id: 'section-issues', label: '📋 Issues', count: pendingIssues.length },
+          { id: 'section-analytics', label: '📊 Analytics' },
+          { id: 'section-universities', label: '🏆 Universities' },
+          { id: 'section-industries', label: '💰 Industries' },
+          { id: 'section-patents', label: '📜 Patents' },
+        ].map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => scrollToSection(tab.id)}
+            style={{
+              flexShrink: 0,
+              padding: '0.5rem 0.9rem',
+              borderRadius: '8px',
+              border: 'none',
+              background: '#f1f5f9',
+              color: GOV.textMuted || '#334155',
+              fontSize: '0.85rem',
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
+          >
+            {tab.label}{typeof tab.count === 'number' ? ` (${tab.count})` : ''}
+          </button>
+        ))}
+      </div>
 
       {/* Stats Overview */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '1rem' }}>
@@ -645,111 +770,154 @@ function AdminDashboard() {
       </div>
 
       {/* Pending Verification Section */}
-      <SectionTitle count={pendingPartners.length}>⏳ Pending Verification</SectionTitle>
-      {pendingPartners.length === 0 && (
-        <GovEmptyState message="No accounts awaiting verification." subMessage="All new registrations have been processed." />
-      )}
-      {pendingPartners.map((p) => (
-        <div key={p.id} style={{ marginBottom: '0.75rem' }}>
-          <PartnerCard partner={{ ...p, handleVerify }} />
-        </div>
-      ))}
-
-      {/* Pending Review Issues */}
-      <SectionTitle count={pendingIssues.length}>📋 Pending Review Issues</SectionTitle>
-      {pendingIssues.length === 0 && (
-        <GovEmptyState message="No issues pending review." subMessage="All submitted issues have been processed." />
-      )}
-      {pendingIssues.map((issue) => (
-        <div key={issue.id} style={{ marginBottom: '0.75rem' }}>
-          <IssueReviewCard issue={{ ...issue, handleApprove: handleApproveIssue, handleReject: handleRejectIssue }} />
-        </div>
-      ))}
-
-      {/* Overall Completion Rate */}
-      <SectionTitle>📊 Overall Completion Rate</SectionTitle>
-      <div style={{ maxWidth: '400px' }}>
-        <CompletionDisplay rate={completionRate} />
+      <div id="section-verification">
+        <SectionTitle count={pendingPartners.length}>⏳ Pending Verification</SectionTitle>
+        {pendingPartners.length === 0 && (
+          <GovEmptyState message="No accounts awaiting verification." subMessage="All new registrations have been processed." />
+        )}
+        {pendingPartners.map((p) => (
+          <div key={p.id} style={{ marginBottom: '0.75rem' }}>
+            <PartnerCard partner={{ ...p, handleVerify }} />
+          </div>
+        ))}
       </div>
 
-      {/* Domain-wise Distribution */}
-      <SectionTitle>🧭 Domain-wise Distribution</SectionTitle>
-      {deptStats.length === 0 && (
-        <GovEmptyState message="No data yet." subMessage="Statistics will appear once issues are reported." />
-      )}
-      <DeptStatsList stats={deptStats} />
-      {deptStats.length > 0 && (
-        <div style={{ background: 'white', borderRadius: '12px', padding: '1rem', marginTop: '1rem', marginBottom: '1rem' }}>
-          <ResponsiveContainer width="100%" height={280}>
-            <BarChart data={deptStats} margin={{ top: 10, right: 20, left: 0, bottom: 40 }}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="dept" angle={-30} textAnchor="end" interval={0} fontSize={11} />
-              <YAxis allowDecimals={false} />
-              <Tooltip />
-              <Bar dataKey="total" fill={GOV.primaryLight} name="Total Reports" radius={[6, 6, 0, 0]} />
-              <Bar dataKey="resolved" fill={GOV.success} name="Resolved" radius={[6, 6, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      )}
+      {/* Pending Review Issues */}
+      <div id="section-issues">
+        <SectionTitle count={pendingIssues.length}>📋 Pending Review Issues</SectionTitle>
+        {pendingIssues.length === 0 && (
+          <GovEmptyState message="No issues pending review." subMessage="All submitted issues have been processed." />
+        )}
+        {pendingIssues.map((issue) => (
+          <div key={issue.id} style={{ marginBottom: '0.75rem' }}>
+            <IssueReviewCard issue={{ ...issue, handleApprove: handleApproveIssue, handleReject: handleRejectIssue }} />
+          </div>
+        ))}
+      </div>
 
-      {/* District-wise Distribution */}
-      <SectionTitle>🗺️ District-wise Distribution</SectionTitle>
-      {districtStats.length === 0 && (
-        <GovEmptyState message="No data yet." subMessage="District data will appear once issues are reported." />
-      )}
-      {districtStats.length > 0 && (
-        <div style={{ background: 'white', borderRadius: '12px', padding: '1rem', marginBottom: '1rem' }}>
-          <ResponsiveContainer width="100%" height={280}>
-            <BarChart data={districtStats} margin={{ top: 10, right: 20, left: 0, bottom: 40 }}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="district" angle={-30} textAnchor="end" interval={0} fontSize={11} />
-              <YAxis allowDecimals={false} />
-              <Tooltip />
-              <Bar dataKey="count" fill={GOV.warning} name="Reports" radius={[6, 6, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
+      {/* Analytics Section */}
+      <div id="section-analytics">
+        {/* Overall Completion Rate */}
+        <SectionTitle>📊 Overall Completion Rate</SectionTitle>
+        <div style={{ maxWidth: '400px' }}>
+          <CompletionDisplay rate={completionRate} />
         </div>
-      )}
 
-            {/* Reporter Type Distribution */}
-      <SectionTitle>🏛️ Reports by Submitter Type</SectionTitle>
-      {reporterTypeStats.length === 0 && (
-        <GovEmptyState message="No data yet." subMessage="Submitter data will appear once issues are reported." />
-      )}
-      {reporterTypeStats.length > 0 && (
-        <div style={{ background: 'white', borderRadius: '12px', padding: '1rem', marginBottom: '1rem' }}>
-          <ResponsiveContainer width="100%" height={280}>
-            <BarChart data={reporterTypeStats} margin={{ top: 10, right: 20, left: 0, bottom: 60 }}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="type" angle={-30} textAnchor="end" interval={0} fontSize={10} />
-              <YAxis allowDecimals={false} />
-              <Tooltip />
-              <Bar dataKey="count" fill={GOV.primary || GOV.primaryLight} name="Reports" radius={[6, 6, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      )}
+        {/* Domain-wise Distribution */}
+        <SectionTitle>🧭 Domain-wise Distribution</SectionTitle>
+        {deptStats.length === 0 && (
+          <GovEmptyState message="No data yet." subMessage="Statistics will appear once issues are reported." />
+        )}
+        <DeptStatsList stats={deptStats} />
+        {deptStats.length > 0 && (
+          <div style={{ background: 'white', borderRadius: '12px', padding: '1rem', marginTop: '1rem', marginBottom: '1rem' }}>
+            <ResponsiveContainer width="100%" height={280}>
+              <BarChart data={deptStats} margin={{ top: 10, right: 20, left: 0, bottom: 40 }}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="dept" angle={-30} textAnchor="end" interval={0} fontSize={11} />
+                <YAxis allowDecimals={false} />
+                <Tooltip />
+                <Bar dataKey="total" fill={GOV.primaryLight} name="Total Reports" radius={[6, 6, 0, 0]} />
+                <Bar dataKey="resolved" fill={GOV.success} name="Resolved" radius={[6, 6, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+
+        {/* District-wise Distribution */}
+        <SectionTitle>🗺️ District-wise Distribution</SectionTitle>
+        {districtStats.length === 0 && (
+          <GovEmptyState message="No data yet." subMessage="District data will appear once issues are reported." />
+        )}
+        {districtStats.length > 0 && (
+          <div style={{ background: 'white', borderRadius: '12px', padding: '1rem', marginBottom: '1rem' }}>
+            <ResponsiveContainer width="100%" height={280}>
+              <BarChart data={districtStats} margin={{ top: 10, right: 20, left: 0, bottom: 40 }}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="district" angle={-30} textAnchor="end" interval={0} fontSize={11} />
+                <YAxis allowDecimals={false} />
+                <Tooltip />
+                <Bar dataKey="count" fill={GOV.warning} name="Reports" radius={[6, 6, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+
+        {/* Reporter Type Distribution */}
+        <SectionTitle>🏛️ Reports by Submitter Type</SectionTitle>
+        {reporterTypeStats.length === 0 && (
+          <GovEmptyState message="No data yet." subMessage="Submitter data will appear once issues are reported." />
+        )}
+        {reporterTypeStats.length > 0 && (
+          <div style={{ background: 'white', borderRadius: '12px', padding: '1rem', marginBottom: '1rem' }}>
+            <ResponsiveContainer width="100%" height={280}>
+              <BarChart data={reporterTypeStats} margin={{ top: 10, right: 20, left: 0, bottom: 60 }}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="type" angle={-30} textAnchor="end" interval={0} fontSize={10} />
+                <YAxis allowDecimals={false} />
+                <Tooltip />
+                <Bar dataKey="count" fill={GOV.primary || GOV.primaryLight} name="Reports" radius={[6, 6, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+      </div>
 
       {/* Top Universities */}
-      <SectionTitle>🏆 Top Universities (by challenges resolved)</SectionTitle>
-      {loading && (
-        <div style={{ textAlign: 'center', padding: '2rem', color: GOV.textMuted }}>Loading rankings...</div>
-      )}
-      {!loading && uniRankings.length === 0 && (
-        <GovEmptyState message="No data yet." subMessage="University rankings will appear once funding is completed." />
-      )}
-      <div style={{ marginTop: '0.75rem' }}>
-        <RankingList title="Top Universities" data={uniRankings} color={GOV.primaryLight} unit="" />
+      <div id="section-universities">
+        <SectionTitle>🏆 Top Universities (by challenges resolved)</SectionTitle>
+        {loading && (
+          <div style={{ textAlign: 'center', padding: '2rem', color: GOV.textMuted }}>Loading rankings...</div>
+        )}
+        {!loading && uniRankings.length === 0 && (
+          <GovEmptyState message="No data yet." subMessage="University rankings will appear once funding is completed." />
+        )}
+        <div style={{ marginTop: '0.75rem' }}>
+          <RankingList title="Top Universities" data={uniRankings} color={GOV.primaryLight} unit="" />
+        </div>
       </div>
 
       {/* Top Industries */}
-      <SectionTitle>💰 Top Industries (by amount funded)</SectionTitle>
-      {!loading && industryRankings.length === 0 && (
-        <GovEmptyState message="No data yet." subMessage="Industry rankings will appear once funding is completed." />
-      )}
-      <div style={{ marginTop: '0.75rem' }}>
-        <RankingList title="Top Industries" data={industryRankings} color={GOV.success} unit="" />
+      <div id="section-industries">
+        <SectionTitle>💰 Top Industries (by amount funded)</SectionTitle>
+        {!loading && industryRankings.length === 0 && (
+          <GovEmptyState message="No data yet." subMessage="Industry rankings will appear once funding is completed." />
+        )}
+        <div style={{ marginTop: '0.75rem' }}>
+          <RankingList title="Top Industries" data={industryRankings} color={GOV.success} unit="" />
+        </div>
+      </div>
+
+      {/* Patents & Innovation Outcomes */}
+      <div id="section-patents">
+        <SectionTitle>📜 Patents & Innovation Outcomes</SectionTitle>
+        {ipStats.count === 0 && (
+          <GovEmptyState message="No IP records yet." subMessage="Patent/IP references will appear here once universities log them during milestone tracking." />
+        )}
+        {ipStats.count > 0 && (
+          <div style={{ background: 'white', borderRadius: '12px', padding: '1.25rem', marginBottom: '1rem' }}>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem', marginBottom: '1rem' }}>
+              <span style={{ fontSize: '2rem', fontWeight: 700, color: GOV.primary || GOV.primaryLight }}>
+                {ipStats.count}
+              </span>
+              <span style={{ color: GOV.textMuted }}>
+                {ipStats.count === 1 ? 'IP / Patent reference logged' : 'IP / Patent references logged'}
+              </span>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+              {ipStats.items.map((item, idx) => (
+                <div key={idx} style={{
+                  borderLeft: `3px solid ${GOV.primary || GOV.primaryLight}`,
+                  paddingLeft: '0.75rem',
+                  fontSize: '0.9rem',
+                }}>
+                  <div style={{ fontWeight: 600, color: GOV.textMuted }}>{item.reference}</div>
+                  <div style={{ fontSize: '0.8rem', color: GOV.textMuted }}>{item.university}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

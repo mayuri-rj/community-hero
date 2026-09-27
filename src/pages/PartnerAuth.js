@@ -6,7 +6,7 @@ import {
 } from 'firebase/auth';
 import { auth } from '../firebase/config';
 import { ensureUserDoc } from '../services/gamificationService';
-import { doc, updateDoc, setDoc } from 'firebase/firestore';
+import { doc, updateDoc, setDoc, addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import { DEPARTMENTS } from '../utils/departmentMapping';
 import { setSignupInProgress } from '../utils/signupFlag';
@@ -180,6 +180,12 @@ function PartnerAuth() {
                     specialization: role === 'university' ? specialization : null,
                     expertise: role === 'university' ? expertise : null,
                     partnerType: role === 'industry' ? partnerType : null,
+                });
+                await addDoc(collection(db, 'notifications'), {
+                    toUid: 'admin-broadcast',
+                    message: `🆕 New ${role === 'university' ? 'university' : (partnerType || 'industry')} partner signed up: ${orgName} — verification pending.`,
+                    read: false,
+                    createdAt: serverTimestamp(),
                 });
             } else {
                 userCredential = await signInWithEmailAndPassword(auth, email, password);
