@@ -37,8 +37,8 @@ Provide insights in this exact JSON format:
 Focus on: most common issues, high severity problems, locations with most issues, resolution rate.
 Only respond with JSON, nothing else.`;
 
-    const response = await ai.models.generateContent({
-      model: "gemini-2.0-flash",
+       const response = await ai.models.generateContent({
+      model: "gemini-3.8-flash",
       contents: [{ parts: [{ text: prompt }] }]
     });
 

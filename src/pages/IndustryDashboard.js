@@ -85,7 +85,7 @@ const UnivHeader = ({ user, userStats }) => (
                 letterSpacing: '-1px',
                 textTransform: 'uppercase'
               }}>
-                Industry Portal
+                Partner & Funding Portal
               </h1>
               <div style={{
                 width: '80px',
@@ -105,7 +105,8 @@ const UnivHeader = ({ user, userStats }) => (
             maxWidth: '600px',
             textShadow: '0 2px 4px rgba(0,0,0,0.2)'
           }}>
-            Department of Higher & Technical Education
+             Industry, Startup, MSME &amp; CSR Funding Partners
+
           </h2>
           <p style={{
             color: 'rgba(255, 255, 255, 0.85)',
@@ -136,7 +137,7 @@ const UnivHeader = ({ user, userStats }) => (
             letterSpacing: '2px',
             marginBottom: '0.5rem'
           }}>
-            Industry Status
+            Partner Status
           </div>
           <div style={{
             color: userStats?.verified ? '#81c784' : '#ffb74d',
@@ -154,7 +155,7 @@ const UnivHeader = ({ user, userStats }) => (
               borderRadius: '50%',
               boxShadow: `0 0 10px ${userStats?.verified ? '#81c784' : '#ffb74d'}`
             }} />
-            {userStats?.verified ? 'Verified Industry' : 'Pending Verification'}
+            {userStats?.verified ? 'Verified Partner' : 'Pending Verification'}
           </div>
           {userStats?.orgName && (
             <div style={{
@@ -610,12 +611,13 @@ function IndustryDashboard({ user, userStats }) {
     }
 
     try {
-      const fundingData = {
+            const fundingData = {
         propId: proposal.id,
         proposalSummary: (proposal.solution || 'Untitled proposal').slice(0, 60),
         issueId: proposal.issueId,
         company: user.uid,
         companyEmail: user.email,
+        partnerType: userStats?.partnerType || 'Industry',
         amount: fundAmount,
         status: 'Funded',
         createdAt: serverTimestamp(),

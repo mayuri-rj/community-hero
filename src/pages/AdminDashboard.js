@@ -480,6 +480,7 @@ function AdminDashboard() {
   const [completionRate, setCompletionRate] = useState(0);
   const [pendingIssues, setPendingIssues] = useState([]);
   const [districtStats, setDistrictStats] = useState([]);
+  const [reporterTypeStats, setReporterTypeStats] = useState([]);
 
   // Pending verification list
   useEffect(() => {
@@ -550,10 +551,20 @@ function AdminDashboard() {
         if (!issue.district) return;
         districtCounts[issue.district] = (districtCounts[issue.district] || 0) + 1;
       });
-      const districtStatsArray = Object.entries(districtCounts)
+            const districtStatsArray = Object.entries(districtCounts)
         .map(([district, count]) => ({ district, count }))
         .sort((a, b) => b.count - a.count);
       setDistrictStats(districtStatsArray);
+
+      const reporterTypeCounts = {};
+      allIssues.forEach((issue) => {
+        const type = issue.reporterType || 'Individual Citizen';
+        reporterTypeCounts[type] = (reporterTypeCounts[type] || 0) + 1;
+      });
+      const reporterTypeStatsArray = Object.entries(reporterTypeCounts)
+        .map(([type, count]) => ({ type, count }))
+        .sort((a, b) => b.count - a.count);
+      setReporterTypeStats(reporterTypeStatsArray);
 
       const totalResolved = allIssues.filter((i) => i.status === 'Resolved').length;
       setCompletionRate(allIssues.length > 0 ? Math.round((totalResolved / allIssues.length) * 100) : 0);
@@ -696,6 +707,25 @@ function AdminDashboard() {
               <YAxis allowDecimals={false} />
               <Tooltip />
               <Bar dataKey="count" fill={GOV.warning} name="Reports" radius={[6, 6, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+
+            {/* Reporter Type Distribution */}
+      <SectionTitle>🏛️ Reports by Submitter Type</SectionTitle>
+      {reporterTypeStats.length === 0 && (
+        <GovEmptyState message="No data yet." subMessage="Submitter data will appear once issues are reported." />
+      )}
+      {reporterTypeStats.length > 0 && (
+        <div style={{ background: 'white', borderRadius: '12px', padding: '1rem', marginBottom: '1rem' }}>
+          <ResponsiveContainer width="100%" height={280}>
+            <BarChart data={reporterTypeStats} margin={{ top: 10, right: 20, left: 0, bottom: 60 }}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="type" angle={-30} textAnchor="end" interval={0} fontSize={10} />
+              <YAxis allowDecimals={false} />
+              <Tooltip />
+              <Bar dataKey="count" fill={GOV.primary || GOV.primaryLight} name="Reports" radius={[6, 6, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>

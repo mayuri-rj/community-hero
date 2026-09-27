@@ -2,19 +2,21 @@ import { GoogleGenAI } from "@google/genai";
 
 const ai = new GoogleGenAI({ apiKey: process.env.REACT_APP_GEMINI_API_KEY });
 
-export const analyzeIssueImage = async (imageFile) => {
+export const analyzeIssueImage = async (imageFile, userDescription = '') => {
   try {
     const imageData = await fileToBase64(imageFile);
 
     const response = await ai.models.generateContent({
-      model: "gemini-2.0-flash",
+      model: "gemini-3.8-flash",
       contents: [
         {
           parts: [
             {
-              text: `Analyze this image of a community/civic issue. Return ONLY a valid JSON object:
+              text: `Analyze this image and description of a community/civic issue reported in Jharkhand, India.
+              Citizen's description: "${userDescription}"
+              Return ONLY a valid JSON object:
               {
-                "category": "Pothole" or "Garbage/Waste" or "Broken Streetlight" or "Water Leakage" or "Damaged Road" or "Encroachment" or "Other",
+                "category": "Pothole" or "Garbage/Waste" or "Broken Streetlight" or "Water Leakage" or "Damaged Road" or "Encroachment" or "Healthcare Issue" or "Education Issue" or "Agriculture/Rural Issue" or "Digital Accessibility Issue" or "Other",
                 "severity": "Low" or "Medium" or "High",
                 "description": "brief one line description"
               }`

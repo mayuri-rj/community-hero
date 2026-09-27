@@ -4,6 +4,7 @@ import { uploadImageToCloudinary } from '../services/cloudinaryService';
 import { db } from '../firebase/config';
 import { collection, addDoc, serverTimestamp, getDoc, doc } from 'firebase/firestore';
 import { awardPointsForReport, checkAndNotifyBadge } from '../services/gamificationService';
+import { analyzeIssueImage } from '../services/geminiService';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 
@@ -48,8 +49,10 @@ function ReportIssue({ user }) {
   const [markerPos, setMarkerPos] = useState(null);
   const [searching, setSearching] = useState(false);
   const [district, setDistrict] = useState('');
+  const [reporterType, setReporterType] = useState('Individual Citizen');
   const [dragOver, setDragOver] = useState(false);
   const searchTimeout = useRef(null);
+  const [showManualCategory, setShowManualCategory] = useState(false);
 
   const [isListening, setIsListening] = useState(false);
   const recognitionRef = useRef(null);
@@ -72,6 +75,60 @@ function ReportIssue({ user }) {
     recognition.onend = () => setIsListening(false);
     recognition.onerror = () => setIsListening(false);
     recognitionRef.current = recognition;
+  }, []);
+
+  // Auto-sync pending offline reports when connection returns
+  useEffect(() => {
+    const syncPendingReports = async () => {
+      const queue = JSON.parse(localStorage.getItem('pendingReports') || '[]');
+      if (queue.length === 0) return;
+
+      console.log(`Syncing ${queue.length} offline report(s)...`);
+      const stillFailed = [];
+
+      for (const report of queue) {
+        try {
+          await addDoc(collection(db, 'issues'), {
+            name: report.name,
+            reporterUid: report.reporterUid,
+            photoURL: report.photoURL,
+            district: report.district,
+            reporterType: report.reporterType,
+            location: report.location,
+            description: report.description,
+            imageUrl: null,
+            mediaType: null,
+            aiCategory: report.aiCategory || 'Other',
+            aiSeverity: report.aiSeverity || 'Medium',
+            aiDescription: report.aiDescription || '',
+            status: 'Pending Review',
+            pendingReview: true,
+            rejectedCount: 0,
+            upvotes: 0,
+            lat: report.lat,
+            lng: report.lng,
+            assignedTo: null,
+            createdAt: serverTimestamp(),
+          });
+        } catch (err) {
+          console.error('Failed to sync a pending report:', err);
+          stillFailed.push(report);
+        }
+      }
+
+      localStorage.setItem('pendingReports', JSON.stringify(stillFailed));
+
+      if (stillFailed.length === 0 && queue.length > 0) {
+        alert(`${queue.length} offline report(s) have been successfully submitted!`);
+      }
+    };
+
+    // Check on page load in case reports were queued during a previous offline session
+    syncPendingReports();
+
+    // Also check whenever the browser regains connectivity
+    window.addEventListener('online', syncPendingReports);
+    return () => window.removeEventListener('online', syncPendingReports);
   }, []);
 
   const toggleListening = () => {
@@ -117,7 +174,7 @@ function ReportIssue({ user }) {
     }, 800);
   }, [location]);
 
-  const handleImageChange = (e) => {
+  const handleImageChange = async (e) => {
     const file = e.target.files?.[0] || e.dataTransfer?.files?.[0];
     if (!file) return;
 
@@ -137,6 +194,23 @@ function ReportIssue({ user }) {
 
     setImage(file);
     setImagePreview(URL.createObjectURL(file));
+
+    setLoading(true);
+    setAiCategory('');
+    setAiSeverity('');
+    try {
+      const result = await analyzeIssueImage(file, description);
+      setAiCategory(result.category || 'Other');
+      setAiSeverity(result.severity || 'Medium');
+      setAiDescription(result.description || '');
+      setShowManualCategory(false);
+    } catch (err) {
+      console.error('AI analysis failed:', err);
+      setAiCategory('');
+      setAiSeverity('');
+      setShowManualCategory(true);
+    }
+    setLoading(false);
   };
 
   const handleLocationSelect = (lat, lng) => {
@@ -165,13 +239,41 @@ function ReportIssue({ user }) {
       return;
     }
     setSubmitting(true);
+
+    // Offline check — save locally if no internet connection
+    if (!navigator.onLine) {
+      const pendingReport = {
+        id: Date.now(),
+        name: user.displayName,
+        reporterUid: user.uid,
+        photoURL: user.photoURL,
+        district,
+        reporterType,
+        location,
+        description,
+        aiCategory: aiCategory || 'Other',
+        aiSeverity: aiSeverity || 'Medium',
+        aiDescription,
+        lat: markerPos.lat,
+        lng: markerPos.lng,
+      };
+      const existingQueue = JSON.parse(localStorage.getItem('pendingReports') || '[]');
+      existingQueue.push(pendingReport);
+      localStorage.setItem('pendingReports', JSON.stringify(existingQueue));
+
+      alert("You're offline. Your report has been saved on this device and will be submitted automatically once you're back online.");
+      setSubmitting(false);
+      setSubmitted(true);
+      return;
+    }
+
     try {
       const result = await uploadImageToCloudinary(image);
       const imageUrl = result?.url || null;
       const mediaType = result?.type || 'image';
       await addDoc(collection(db, 'issues'), {
         name: user.displayName, reporterUid: user.uid, photoURL: user.photoURL,
-        district, location, description, imageUrl, mediaType,
+        district, reporterType, location, description, imageUrl, mediaType,
         aiCategory: aiCategory || 'Other', aiSeverity: aiSeverity || 'Medium',
         aiDescription, status: 'Pending Review', pendingReview: true,
         rejectedCount: 0, upvotes: 0,
@@ -254,7 +356,7 @@ function ReportIssue({ user }) {
           <button className="success-btn" onClick={() => {
             setSubmitted(false); setLocation(''); setDescription(''); setImage(null);
             setImagePreview(null); setAiCategory(''); setAiSeverity('');
-            setMarkerPos(null); setSearchCoords(null);
+            setMarkerPos(null); setSearchCoords(null); setShowManualCategory(false);
           }} style={{
             backgroundColor: '#1d4ed8', color: 'white', padding: '1rem 2.5rem',
             border: 'none', borderRadius: '50px', fontSize: '1rem',
@@ -518,7 +620,6 @@ function ReportIssue({ user }) {
                   className="input-field"
                   style={{ marginBottom: '1rem' }}
                 >
-                  <option value="">Select district...</option>
                   {[
                     'Bokaro', 'Chatra', 'Deoghar', 'Dhanbad', 'Dumka', 'East Singhbhum',
                     'Garhwa', 'Giridih', 'Godda', 'Gumla', 'Hazaribagh', 'Jamtara',
@@ -528,6 +629,22 @@ function ReportIssue({ user }) {
                   ].map((d) => (
                     <option key={d} value={d}>{d}</option>
                   ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="label">Reporting As</label>
+                <select
+                  value={reporterType}
+                  onChange={(e) => setReporterType(e.target.value)}
+                  className="input-field"
+                  style={{ marginBottom: '1rem' }}
+                >
+                  <option value="Individual Citizen">Individual Citizen</option>
+                  <option value="Community Group">Community Group</option>
+                  <option value="Panchayati Raj Institution (PRI)">Panchayati Raj Institution (PRI)</option>
+                  <option value="Urban Local Body (ULB)">Urban Local Body (ULB)</option>
+                  <option value="Government Department">Government Department</option>
                 </select>
               </div>
               <div>
@@ -669,39 +786,8 @@ function ReportIssue({ user }) {
                   Listening... speak now
                 </div>
               )}
-
-              {/* Category & Severity side by side */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginTop: '0.5rem' }}>
-                <div>
-                  <label className="label">🏷️ Category</label>
-                  <select value={aiCategory} onChange={(e) => setAiCategory(e.target.value)}
-                    className="input-field" style={{ cursor: 'pointer' }}>
-                    <option value="">Select...</option>
-                    <option value="Pothole">🕳️ Pothole</option>
-                    <option value="Garbage/Waste">🗑️ Garbage/Waste</option>
-                    <option value="Broken Streetlight">💡 Broken Streetlight</option>
-                    <option value="Water Leakage">💧 Water Leakage</option>
-                    <option value="Damaged Road">🛣️ Damaged Road</option>
-                    <option value="Encroachment">🚧 Encroachment</option>
-                    <option value="Healthcare Issue">🏥 Healthcare Issue</option>
-                    <option value="Education Issue">📚 Education Issue</option>
-                    <option value="Agriculture/Rural Issue">🌾 Agriculture</option>
-                    <option value="Digital Accessibility Issue">♿ Accessibility</option>
-                    <option value="Other">❓ Other</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="label">⚠️ Severity</label>
-                  <select value={aiSeverity} onChange={(e) => setAiSeverity(e.target.value)}
-                    className="input-field" style={{ cursor: 'pointer' }}>
-                    <option value="">Select...</option>
-                    <option value="High">🔴 High</option>
-                    <option value="Medium">🟡 Medium</option>
-                    <option value="Low">🟢 Low</option>
-                  </select>
-                </div>
-              </div>
             </div>
+
 
             {/* Upload */}
             <div className="form-section section-card" style={{ animationDelay: '0.3s' }}>
@@ -717,7 +803,6 @@ function ReportIssue({ user }) {
                 }}>📸</span>
                 Evidence
               </h3>
-
               <div
                 className={`upload-zone ${dragOver ? 'drag-over' : ''}`}
                 onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
@@ -728,10 +813,9 @@ function ReportIssue({ user }) {
                   borderRadius: '16px', padding: imagePreview ? '0.8rem' : '2rem 1.5rem',
                   textAlign: 'center', cursor: 'pointer',
                   backgroundColor: dragOver ? '#dbeafe' : '#fafbff',
+                  position: 'relative',
                 }}
               >
-                <input type="file" accept="image/*,video/*" onChange={handleImageChange}
-                  style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer', width: '100%' }} />
                 {imagePreview ? (
                   <div style={{ position: 'relative' }}>
                     <img src={imagePreview} alt="preview" style={{
@@ -821,6 +905,89 @@ function ReportIssue({ user }) {
                   <p style={{ color: '#1d4ed8', margin: 0, fontSize: '0.88rem', fontWeight: 600 }}>
                     AI is analyzing your image...
                   </p>
+                </div>
+              )}
+            </div>
+
+            {/* Category & Severity side by side */}
+            <div className="form-section section-card">
+              {aiCategory && !showManualCategory ? (
+                <div style={{
+                  marginTop: '0.5rem',
+                  background: '#eff6ff',
+                  border: '1px solid #bfdbfe',
+                  borderRadius: '14px',
+                  padding: '1rem 1.2rem',
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+                    <div>
+                      <p style={{ margin: '0 0 0.3rem', fontSize: '0.8rem', color: '#3b82f6', fontWeight: 700 }}>
+                        🤖 AI Detected
+                      </p>
+                      <p style={{ margin: 0, fontSize: '0.95rem', color: '#0f172a', fontWeight: 700 }}>
+                        {aiCategory} · {aiSeverity} severity
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowManualCategory(true)}
+                      style={{
+                        background: 'white',
+                        color: '#1d4ed8',
+                        border: '1px solid #93c5fd',
+                        borderRadius: '10px',
+                        padding: '0.5rem 0.9rem',
+                        fontSize: '0.8rem',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      Not accurate? Edit manually
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div style={{ marginTop: '0.5rem' }}>
+                  {!aiCategory && image && (
+                    <p style={{ fontSize: '0.8rem', color: '#d97706', fontWeight: 600, marginBottom: '0.5rem' }}>
+                      ⚠️ AI categorization unavailable (offline or slow connection) — please select manually:
+                    </p>
+                  )}
+                  {!aiCategory && !image && (
+                    <p style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 500, marginBottom: '0.5rem' }}>
+                      Upload a photo above for automatic AI detection, or select manually:
+                    </p>
+                  )}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                    <div>
+                      <label className="label">🏷️ Category</label>
+                      <select value={aiCategory} onChange={(e) => setAiCategory(e.target.value)}
+                        className="input-field" style={{ cursor: 'pointer' }}>
+                        <option value="">Select...</option>
+                        <option value="Pothole">🕳️ Pothole</option>
+                        <option value="Garbage/Waste">🗑️ Garbage/Waste</option>
+                        <option value="Broken Streetlight">💡 Broken Streetlight</option>
+                        <option value="Water Leakage">💧 Water Leakage</option>
+                        <option value="Damaged Road">🛣️ Damaged Road</option>
+                        <option value="Encroachment">🚧 Encroachment</option>
+                        <option value="Healthcare Issue">🏥 Healthcare Issue</option>
+                        <option value="Education Issue">📚 Education Issue</option>
+                        <option value="Agriculture/Rural Issue">🌾 Agriculture</option>
+                        <option value="Digital Accessibility Issue">♿ Accessibility</option>
+                        <option value="Other">❓ Other</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="label">⚠️ Severity</label>
+                      <select value={aiSeverity} onChange={(e) => setAiSeverity(e.target.value)}
+                        className="input-field" style={{ cursor: 'pointer' }}>
+                        <option value="">Select...</option>
+                        <option value="High">🔴 High</option>
+                        <option value="Medium">🟡 Medium</option>
+                        <option value="Low">🟢 Low</option>
+                      </select>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>

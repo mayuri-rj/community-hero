@@ -248,21 +248,6 @@ function Login() {
 
         <div className="login-card-inner" style={{ padding: '2.5rem 2.2rem' }}>
 
-          {/* Hero Icon */}
-          <div style={{ textAlign: 'center', marginBottom: '0.5rem' }}>
-            <span className="hero-icon" style={{ fontSize: '4.5rem' }}>🦸</span>
-          </div>
-
-          <h1 className="hero-title" style={{
-            color: '#0f172a',
-            textAlign: 'center',
-            fontSize: '1.9rem',
-            fontWeight: '800',
-            margin: '0 0 0.3rem',
-            letterSpacing: '-0.8px',
-          }}>
-            Community Hero
-          </h1>
           <p style={{
             color: '#94a3b8',
             textAlign: 'center',

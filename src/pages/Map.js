@@ -73,8 +73,8 @@ function Map() {
         </p>
       </div>
       <MapContainer
-        center={[19.0760, 72.8777]}
-        zoom={12}
+        center={[23.61, 85.28]}
+        zoom={7}
         style={{ height: '70vh', width: '100%' }}
       >
         {/* CartoDB Voyager — crisp tiles with road/shop/landmark labels, no API key needed */}
