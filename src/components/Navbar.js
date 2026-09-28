@@ -58,7 +58,7 @@ function Navbar({ user, userStats }) {
               broadcastKey={ADMIN_EMAILS.includes(user.email) ? 'admin-broadcast' : null}
               hidePersonal={ADMIN_EMAILS.includes(user.email)}
             />
-            {userStats && (
+            {userStats && !ADMIN_EMAILS.includes(user.email) && (
               <span style={{
                 backgroundColor: 'rgba(255,255,255,0.2)',
                 color: 'white',

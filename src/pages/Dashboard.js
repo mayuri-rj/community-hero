@@ -533,7 +533,7 @@ function Dashboard({ user, userStats }) {
       <div style={{ maxWidth: '1240px', margin: '-2.8rem auto 0', padding: '0 1.5rem', position: 'relative', zIndex: 2 }}>
 
         {/* User Hero Civic Score Card */}
-        {user && userStats && (
+        {user && userStats && !ADMIN_EMAILS.includes(user.email) && (
           <div className="db-fade-up db-panel" style={{
             background: 'linear-gradient(135deg, #111827 0%, #1e293b 100%)',
             border: '1px solid #eab308',

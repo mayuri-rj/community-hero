@@ -1002,7 +1002,7 @@ function ReportIssue({ user }) {
                 </div>
               ) : (
                 <div style={{ marginTop: '0.5rem' }}>
-                  {!aiCategory && image && (
+                  {!aiCategory && image && !loading && (
                     <p style={{ fontSize: '0.8rem', color: '#d97706', fontWeight: 600, marginBottom: '0.5rem' }}>
                       ⚠️ AI categorization unavailable (offline or slow connection) — please select manually:
                     </p>
